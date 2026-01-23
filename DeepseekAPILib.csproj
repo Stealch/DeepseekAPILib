@@ -49,7 +49,6 @@
     <Compile Include="DeepSeekAPI.cs" />
     <Compile Include="Models\ChatResponse.cs" />
     <Compile Include="Models\ApiError.cs" />
-    <Compile Include="Models\ChatMessage.cs" />
     <Compile Include="Models\CompletionResponse.cs" />
     <Compile Include="Models\ChatRequest.cs" />
     <Compile Include="Models\CompletionRequest.cs" />
