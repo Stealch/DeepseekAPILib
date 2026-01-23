@@ -44,8 +44,10 @@ namespace DeepseekAPILib
 
             ApiKey = apiKey;
 
-            _httpClient = new HttpClient();
-            _httpClient.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
+            _httpClient = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(TimeoutSeconds)
+            };
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ApiKey}");
             _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
 
