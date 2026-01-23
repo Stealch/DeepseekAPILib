@@ -64,7 +64,13 @@
     <Compile Include="Models\CompletionResponse.cs" />
     <Compile Include="Models\ChatRequest.cs" />
     <Compile Include="Models\CompletionRequest.cs" />
+    <Compile Include="OAuth\BaseOAuthProvider.cs" />
+    <Compile Include="OAuth\GitHubOAuthProvider.cs" />
+    <Compile Include="OAuth\GoogleOAuthProvider.cs" />
+    <Compile Include="OAuth\IOAuthProvider.cs" />
+    <Compile Include="OAuth\OAuthResult.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Services\DeepseekAuthService.cs" />
     <Compile Include="Utilites\SseParser.cs" />
   </ItemGroup>
   <ItemGroup>
