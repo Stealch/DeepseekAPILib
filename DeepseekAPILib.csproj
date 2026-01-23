@@ -66,6 +66,7 @@
     <Compile Include="Models\ChatRequest.cs" />
     <Compile Include="Models\CompletionRequest.cs" />
     <Compile Include="OAuth\BaseOAuthProvider.cs" />
+    <Compile Include="OAuth\SystemBrowserOAuthService.cs" />
     <Compile Include="OAuth\GitHubOAuthProvider.cs" />
     <Compile Include="OAuth\GoogleOAuthProvider.cs" />
     <Compile Include="OAuth\IOAuthProvider.cs" />
