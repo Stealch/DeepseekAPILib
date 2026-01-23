@@ -64,6 +64,31 @@ namespace DeepseekAPILib.OAuth
             }
         }
 
+        private void InitializeProvider(string provider)
+        {
+            switch (provider.ToLowerInvariant())
+            {
+                case "google":
+                    Name = "Google";
+                    AuthorizationEndpoint = "https://accounts.google.com/o/oauth2/v2/auth";
+                    TokenEndpoint = "https://oauth2.googleapis.com/token";
+                    Scopes = new[] { "openid", "email", "profile" };
+                    UsePkce = true;
+                    break;
+
+                case "github":
+                    Name = "GitHub";
+                    AuthorizationEndpoint = "https://github.com/login/oauth/authorize";
+                    TokenEndpoint = "https://github.com/login/oauth/access_token";
+                    Scopes = new[] { "user:email" };
+                    UsePkce = false;
+                    break;
+
+                default:
+                    throw new ArgumentException($"Unsupported provider: {provider}", nameof(provider));
+            }
+        }
+
         public async Task<OAuthResult> AuthorizeAsync(CancellationToken cancellationToken = default)
         {
             // Генерируем PKCE codes если нужно
