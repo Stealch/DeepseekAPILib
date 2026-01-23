@@ -1,9 +1,9 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Net.Http;
 using System.Text; // Добавлено
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 
 namespace DeepseekAPILib.Services
 {
