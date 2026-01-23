@@ -1,9 +1,11 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DeepseekAPILib
@@ -175,7 +177,125 @@ namespace DeepseekAPILib
 
             throw new Models.DeepseekApiException(errorMessage, (int)response.StatusCode, errorType, errorCode);
         }
+        /// <summary>
+        /// Sends a streaming chat completion request
+        /// </summary>
+        public async IAsyncEnumerable<Models.StreamingChatChunk> SendChatStreamingAsync(
+            Models.ChatRequest request,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
 
+            request.Stream = true;
+
+            var jsonContent = JsonConvert.SerializeObject(request, _jsonSettings);
+            using var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/v1/chat/completions")
+            {
+                Content = content
+            };
+
+            using var response = await _httpClient.SendAsync(
+                requestMessage,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                await HandleErrorResponse(response);
+            }
+
+            using var stream = await response.Content.ReadAsStreamAsync();
+            using var reader = new StreamReader(stream);
+
+            while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
+            {
+                var line = await reader.ReadLineAsync();
+                if (string.IsNullOrEmpty(line))
+                    continue;
+
+                // SSE формат: data: {json}
+                if (line.StartsWith("data: "))
+                {
+                    var json = line.Substring(6);
+                    if (json == "[DONE]")
+                        yield break;
+
+                    try
+                    {
+                        var chunk = JsonConvert.DeserializeObject<Models.StreamingChatChunk>(json);
+                        if (chunk != null)
+                            yield return chunk;
+                    }
+                    catch (JsonException)
+                    {
+                        // Игнорируем некорректные JSON чанки
+                        continue;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Sends a streaming completion request
+        /// </summary>
+        public async IAsyncEnumerable<Models.StreamingCompletionChunk> SendCompletionStreamingAsync(
+            Models.CompletionRequest request,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            if (request == null)
+                throw new ArgumentNullException(nameof(request));
+
+            request.Stream = true;
+
+            var jsonContent = JsonConvert.SerializeObject(request, _jsonSettings);
+            using var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/v1/completions")
+            {
+                Content = content
+            };
+
+            using var response = await _httpClient.SendAsync(
+                requestMessage,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                await HandleErrorResponse(response);
+            }
+
+            using var stream = await response.Content.ReadAsStreamAsync();
+            using var reader = new StreamReader(stream);
+
+            while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
+            {
+                var line = await reader.ReadLineAsync();
+                if (string.IsNullOrEmpty(line))
+                    continue;
+
+                if (line.StartsWith("data: "))
+                {
+                    var json = line.Substring(6);
+                    if (json == "[DONE]")
+                        yield break;
+
+                    try
+                    {
+                        var chunk = JsonConvert.DeserializeObject<Models.StreamingCompletionChunk>(json);
+                        if (chunk != null)
+                            yield return chunk;
+                    }
+                    catch (JsonException)
+                    {
+                        continue;
+                    }
+                }
+            }
+        }
         /// <summary>
         /// Disposes the HttpClient
         /// </summary>

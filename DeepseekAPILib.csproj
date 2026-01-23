@@ -49,10 +49,13 @@
     <Compile Include="DeepSeekAPI.cs" />
     <Compile Include="Models\ChatResponse.cs" />
     <Compile Include="Models\ApiError.cs" />
+    <Compile Include="Models\StreamingCompletionChunk.cs" />
+    <Compile Include="Models\StreamingChatChunk.cs" />
     <Compile Include="Models\CompletionResponse.cs" />
     <Compile Include="Models\ChatRequest.cs" />
     <Compile Include="Models\CompletionRequest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Utilites\SseParser.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
