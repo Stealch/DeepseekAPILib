@@ -180,9 +180,8 @@ namespace DeepseekAPILib
         /// <summary>
         /// Sends a streaming chat completion request
         /// </summary>
-        public async IAsyncEnumerable<Models.StreamingChatChunk> SendChatStreamingAsync(
-            Models.ChatRequest request,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        public async System.Collections.Generic.IAsyncEnumerable<Models.StreamingChatChunk> SendChatStreamingAsync(
+            Models.ChatRequest request)
         {
             if (request == null)
                 throw new ArgumentNullException(nameof(request));
@@ -192,48 +191,42 @@ namespace DeepseekAPILib
             var jsonContent = JsonConvert.SerializeObject(request, _jsonSettings);
             using var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/v1/chat/completions")
-            {
-                Content = content
-            };
-
-            using var response = await _httpClient.SendAsync(
-                requestMessage,
-                HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken);
+            using var response = await _httpClient.PostAsync($"{BaseUrl}/v1/chat/completions", content);
 
             if (!response.IsSuccessStatusCode)
             {
                 await HandleErrorResponse(response);
+                yield break;
             }
 
             using var stream = await response.Content.ReadAsStreamAsync();
             using var reader = new StreamReader(stream);
 
-            while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
+            while (!reader.EndOfStream)
             {
                 var line = await reader.ReadLineAsync();
                 if (string.IsNullOrEmpty(line))
                     continue;
 
-                // SSE формат: data: {json}
                 if (line.StartsWith("data: "))
                 {
                     var json = line.Substring(6);
                     if (json == "[DONE]")
                         yield break;
 
+                    Models.StreamingChatChunk chunk;
                     try
                     {
-                        var chunk = JsonConvert.DeserializeObject<Models.StreamingChatChunk>(json);
-                        if (chunk != null)
-                            yield return chunk;
+                        chunk = JsonConvert.DeserializeObject<Models.StreamingChatChunk>(json);
                     }
                     catch (JsonException)
                     {
                         // Игнорируем некорректные JSON чанки
                         continue;
                     }
+
+                    if (chunk != null)
+                        yield return chunk;
                 }
             }
         }
@@ -241,9 +234,8 @@ namespace DeepseekAPILib
         /// <summary>
         /// Sends a streaming completion request
         /// </summary>
-        public async IAsyncEnumerable<Models.StreamingCompletionChunk> SendCompletionStreamingAsync(
-            Models.CompletionRequest request,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        public async System.Collections.Generic.IAsyncEnumerable<Models.StreamingCompletionChunk> SendCompletionStreamingAsync(
+            Models.CompletionRequest request)
         {
             if (request == null)
                 throw new ArgumentNullException(nameof(request));
@@ -253,25 +245,18 @@ namespace DeepseekAPILib
             var jsonContent = JsonConvert.SerializeObject(request, _jsonSettings);
             using var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/v1/completions")
-            {
-                Content = content
-            };
-
-            using var response = await _httpClient.SendAsync(
-                requestMessage,
-                HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken);
+            using var response = await _httpClient.PostAsync($"{BaseUrl}/v1/completions", content);
 
             if (!response.IsSuccessStatusCode)
             {
                 await HandleErrorResponse(response);
+                yield break;
             }
 
             using var stream = await response.Content.ReadAsStreamAsync();
             using var reader = new StreamReader(stream);
 
-            while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
+            while (!reader.EndOfStream)
             {
                 var line = await reader.ReadLineAsync();
                 if (string.IsNullOrEmpty(line))
@@ -283,16 +268,18 @@ namespace DeepseekAPILib
                     if (json == "[DONE]")
                         yield break;
 
+                    Models.StreamingCompletionChunk chunk;
                     try
                     {
-                        var chunk = JsonConvert.DeserializeObject<Models.StreamingCompletionChunk>(json);
-                        if (chunk != null)
-                            yield return chunk;
+                        chunk = JsonConvert.DeserializeObject<Models.StreamingCompletionChunk>(json);
                     }
                     catch (JsonException)
                     {
                         continue;
                     }
+
+                    if (chunk != null)
+                        yield return chunk;
                 }
             }
         }

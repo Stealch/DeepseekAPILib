@@ -7,24 +7,13 @@ namespace DeepseekAPILib.Utilities
 {
     public static class SseParser
     {
-        public static async IAsyncEnumerable<string> ParseSseStreamAsync(
-            Stream stream,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        public static string ParseSseLine(string line)
         {
-            using var reader = new StreamReader(stream);
+            if (string.IsNullOrEmpty(line) || !line.StartsWith("data: "))
+                return null;
 
-            while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
-            {
-                var line = await reader.ReadLineAsync();
-                if (string.IsNullOrEmpty(line))
-                    continue;
-
-                if (line.StartsWith("data: "))
-                {
-                    var data = line.Substring(6);
-                    yield return data;
-                }
-            }
+            var data = line.Substring(6);
+            return data == "[DONE]" ? null : data;
         }
     }
 }
