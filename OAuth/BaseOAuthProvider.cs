@@ -1,11 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Web;
+using System.Web; // Для HttpUtility
 using Newtonsoft.Json;
 
 namespace DeepseekAPILib.OAuth
@@ -72,7 +73,7 @@ namespace DeepseekAPILib.OAuth
         /// <summary>
         /// Обменяет authorization code на access token
         /// </summary>
-        protected async Task<OAuthResult> ExchangeCodeForTokenAsync(string code, string codeVerifier, CancellationToken cancellationToken)
+        protected virtual async Task<OAuthResult> ExchangeCodeForTokenAsync(string code, string codeVerifier, CancellationToken cancellationToken)
         {
             var requestContent = new FormUrlEncodedContent(new[]
             {

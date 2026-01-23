@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Web
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -41,12 +43,12 @@ namespace DeepseekAPILib.OAuth
 
         protected override async Task<OAuthResult> ExchangeCodeForTokenAsync(string code, string codeVerifier, CancellationToken cancellationToken)
         {
-            var requestContent = new System.Net.Http.FormUrlEncodedContent(new[]
+            var requestContent = new FormUrlEncodedContent(new[]
             {
-                new System.Collections.Generic.KeyValuePair<string, string>("client_id", ClientId),
-                new System.Collections.Generic.KeyValuePair<string, string>("client_secret", _clientSecret),
-                new System.Collections.Generic.KeyValuePair<string, string>("code", code),
-                new System.Collections.Generic.KeyValuePair<string, string>("redirect_uri", _redirectUri)
+                new KeyValuePair<string, string>("client_id", ClientId),
+                new KeyValuePair<string, string>("client_secret", _clientSecret),
+                new KeyValuePair<string, string>("code", code),
+                new KeyValuePair<string, string>("redirect_uri", _redirectUri)
             });
 
             var response = await _httpClient.PostAsync(TokenEndpoint, requestContent, cancellationToken);
