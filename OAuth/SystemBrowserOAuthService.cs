@@ -17,7 +17,6 @@ namespace DeepseekAPILib.OAuth
     public class SystemBrowserOAuthService : IOAuthProvider, IDisposable
     {
         private readonly HttpClient _httpClient;
-        private readonly string _clientId;
         private readonly string _clientSecret;
         private readonly string _redirectUri;
         private HttpListener _httpListener;
@@ -27,13 +26,13 @@ namespace DeepseekAPILib.OAuth
         public string Name { get; private set; }
         public string AuthorizationEndpoint { get; private set; }
         public string TokenEndpoint { get; private set; }
-        public string ClientId => _clientId; // Добавить эту строку
+        public string ClientId { get; } // Добавить эту строку
         public string[] Scopes { get; private set; }
         public bool UsePkce { get; private set; }
 
         public SystemBrowserOAuthService(string provider, string clientId, string redirectUri, string clientSecret = null)
         {
-            _clientId = clientId ?? throw new ArgumentNullException(nameof(clientId));
+            ClientId = clientId ?? throw new ArgumentNullException(nameof(clientId));
             _clientSecret = clientSecret;
             _redirectUri = redirectUri ?? throw new ArgumentNullException(nameof(redirectUri));
             _httpClient = new HttpClient();
@@ -150,7 +149,7 @@ namespace DeepseekAPILib.OAuth
         {
             var formData = new System.Collections.Generic.Dictionary<string, string>
             {
-                ["client_id"] = _clientId,
+                ["client_id"] = ClientId,
                 ["code"] = code,
                 ["redirect_uri"] = redirectUrl,
                 ["grant_type"] = "authorization_code"
@@ -179,7 +178,7 @@ namespace DeepseekAPILib.OAuth
             var builder = new UriBuilder(AuthorizationEndpoint);
             var query = HttpUtility.ParseQueryString(builder.Query);
 
-            query["client_id"] = _clientId;
+            query["client_id"] = ClientId;
             query["redirect_uri"] = redirectUrl;
             query["response_type"] = "code";
             query["scope"] = string.Join(" ", Scopes);
@@ -281,7 +280,7 @@ namespace DeepseekAPILib.OAuth
 
             var formData = new System.Collections.Generic.Dictionary<string, string>
             {
-                ["client_id"] = _clientId,
+                ["client_id"] = ClientId,
                 ["refresh_token"] = refreshToken,
                 ["grant_type"] = "refresh_token"
             };
@@ -311,5 +310,9 @@ namespace DeepseekAPILib.OAuth
     {
         public OAuthException(string message) : base(message) { }
         public OAuthException(string message, Exception innerException) : base(message, innerException) { }
+
+        public OAuthException() : base()
+        {
+        }
     }
 }

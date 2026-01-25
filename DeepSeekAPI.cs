@@ -179,53 +179,58 @@ namespace DeepseekAPILib
         /// <summary>
         /// Sends a streaming chat completion request
         /// </summary>
-        public async System.Collections.Generic.IAsyncEnumerable<Models.StreamingChatChunk> SendChatStreamingAsync(
+        public System.Collections.Generic.IAsyncEnumerable<Models.StreamingChatChunk> SendChatStreamingAsync(
             Models.ChatRequest request)
         {
             if (request == null)
                 throw new ArgumentNullException(nameof(request));
 
-            request.Stream = true;
+            return SendChatStreamingAsync2();
 
-            var jsonContent = JsonConvert.SerializeObject(request, _jsonSettings);
-            using var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-
-            using var response = await _httpClient.PostAsync($"{BaseUrl}/v1/chat/completions", content);
-
-            if (!response.IsSuccessStatusCode)
+            async System.Collections.Generic.IAsyncEnumerable<Models.StreamingChatChunk> SendChatStreamingAsync2()
             {
-                await HandleErrorResponse(response);
-                yield break;
-            }
+                request.Stream = true;
 
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var reader = new StreamReader(stream);
+                var jsonContent = JsonConvert.SerializeObject(request, _jsonSettings);
+                using var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-            while (!reader.EndOfStream)
-            {
-                var line = await reader.ReadLineAsync();
-                if (string.IsNullOrEmpty(line))
-                    continue;
+                using var response = await _httpClient.PostAsync($"{BaseUrl}/v1/chat/completions", content);
 
-                if (line.StartsWith("data: "))
+                if (!response.IsSuccessStatusCode)
                 {
-                    var json = line.Substring(6);
-                    if (json == "[DONE]")
-                        yield break;
+                    await HandleErrorResponse(response);
+                    yield break;
+                }
 
-                    Models.StreamingChatChunk chunk;
-                    try
-                    {
-                        chunk = JsonConvert.DeserializeObject<Models.StreamingChatChunk>(json);
-                    }
-                    catch (JsonException)
-                    {
-                        // Игнорируем некорректные JSON чанки
+                using var stream = await response.Content.ReadAsStreamAsync();
+                using var reader = new StreamReader(stream);
+
+                while (!reader.EndOfStream)
+                {
+                    var line = await reader.ReadLineAsync();
+                    if (string.IsNullOrEmpty(line))
                         continue;
-                    }
 
-                    if (chunk != null)
-                        yield return chunk;
+                    if (line.StartsWith("data: "))
+                    {
+                        var json = line.Substring(6);
+                        if (json == "[DONE]")
+                            yield break;
+
+                        Models.StreamingChatChunk chunk;
+                        try
+                        {
+                            chunk = JsonConvert.DeserializeObject<Models.StreamingChatChunk>(json);
+                        }
+                        catch (JsonException)
+                        {
+                            // Игнорируем некорректные JSON чанки
+                            continue;
+                        }
+
+                        if (chunk != null)
+                            yield return chunk;
+                    }
                 }
             }
         }
@@ -233,52 +238,57 @@ namespace DeepseekAPILib
         /// <summary>
         /// Sends a streaming completion request
         /// </summary>
-        public async System.Collections.Generic.IAsyncEnumerable<Models.StreamingCompletionChunk> SendCompletionStreamingAsync(
+        public System.Collections.Generic.IAsyncEnumerable<Models.StreamingCompletionChunk> SendCompletionStreamingAsync(
             Models.CompletionRequest request)
         {
             if (request == null)
                 throw new ArgumentNullException(nameof(request));
 
-            request.Stream = true;
+            return SendCompletionStreamingAsync2();
 
-            var jsonContent = JsonConvert.SerializeObject(request, _jsonSettings);
-            using var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-
-            using var response = await _httpClient.PostAsync($"{BaseUrl}/v1/completions", content);
-
-            if (!response.IsSuccessStatusCode)
+            async IAsyncEnumerable<Models.StreamingCompletionChunk> SendCompletionStreamingAsync2()
             {
-                await HandleErrorResponse(response);
-                yield break;
-            }
+                request.Stream = true;
 
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var reader = new StreamReader(stream);
+                var jsonContent = JsonConvert.SerializeObject(request, _jsonSettings);
+                using var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-            while (!reader.EndOfStream)
-            {
-                var line = await reader.ReadLineAsync();
-                if (string.IsNullOrEmpty(line))
-                    continue;
+                using var response = await _httpClient.PostAsync($"{BaseUrl}/v1/completions", content);
 
-                if (line.StartsWith("data: "))
+                if (!response.IsSuccessStatusCode)
                 {
-                    var json = line.Substring(6);
-                    if (json == "[DONE]")
-                        yield break;
+                    await HandleErrorResponse(response);
+                    yield break;
+                }
 
-                    Models.StreamingCompletionChunk chunk;
-                    try
-                    {
-                        chunk = JsonConvert.DeserializeObject<Models.StreamingCompletionChunk>(json);
-                    }
-                    catch (JsonException)
-                    {
+                using var stream = await response.Content.ReadAsStreamAsync();
+                using var reader = new StreamReader(stream);
+
+                while (!reader.EndOfStream)
+                {
+                    var line = await reader.ReadLineAsync();
+                    if (string.IsNullOrEmpty(line))
                         continue;
-                    }
 
-                    if (chunk != null)
-                        yield return chunk;
+                    if (line.StartsWith("data: "))
+                    {
+                        var json = line.Substring(6);
+                        if (json == "[DONE]")
+                            yield break;
+
+                        Models.StreamingCompletionChunk chunk;
+                        try
+                        {
+                            chunk = JsonConvert.DeserializeObject<Models.StreamingCompletionChunk>(json);
+                        }
+                        catch (JsonException)
+                        {
+                            continue;
+                        }
+
+                        if (chunk != null)
+                            yield return chunk;
+                    }
                 }
             }
         }

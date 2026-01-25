@@ -1,6 +1,5 @@
 ﻿using System;
 
-
 namespace DeepseekAPILib.Models
 {
     /// <summary>
@@ -67,6 +66,18 @@ namespace DeepseekAPILib.Models
             : base(message, innerException)
         {
             StatusCode = statusCode;
+        }
+
+        public DeepseekApiException() : base()
+        {
+        }
+
+        public DeepseekApiException(string message) : base(message)
+        {
+        }
+
+        public DeepseekApiException(string message, Exception innerException) : base(message, innerException)
+        {
         }
     }
 }
