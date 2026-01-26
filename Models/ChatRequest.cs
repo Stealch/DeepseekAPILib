@@ -15,7 +15,7 @@ namespace DeepseekAPILib.Models
         /// <summary>
         /// List of messages in the conversation
         /// </summary>
-        public List<DeepseekAPILib.ChatMessage> Messages { get; set; }
+        public List<ChatMessage> Messages { get; set; }
 
         /// <summary>
         /// Maximum number of tokens to generate

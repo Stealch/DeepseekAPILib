@@ -179,7 +179,7 @@ namespace DeepseekAPILib
         /// <summary>
         /// Sends a streaming chat completion request
         /// </summary>
-        public System.Collections.Generic.IAsyncEnumerable<Models.StreamingChatChunk> SendChatStreamingAsync(
+        public IAsyncEnumerable<Models.StreamingChatChunk> SendChatStreamingAsync(
             Models.ChatRequest request)
         {
             if (request == null)
@@ -187,7 +187,7 @@ namespace DeepseekAPILib
 
             return SendChatStreamingAsync2();
 
-            async System.Collections.Generic.IAsyncEnumerable<Models.StreamingChatChunk> SendChatStreamingAsync2()
+            async IAsyncEnumerable<Models.StreamingChatChunk> SendChatStreamingAsync2()
             {
                 request.Stream = true;
 
@@ -238,7 +238,7 @@ namespace DeepseekAPILib
         /// <summary>
         /// Sends a streaming completion request
         /// </summary>
-        public System.Collections.Generic.IAsyncEnumerable<Models.StreamingCompletionChunk> SendCompletionStreamingAsync(
+        public IAsyncEnumerable<Models.StreamingCompletionChunk> SendCompletionStreamingAsync(
             Models.CompletionRequest request)
         {
             if (request == null)
