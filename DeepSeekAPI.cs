@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using DeepseekAPILib.Models;
 
 // DeepSeekAPI.cs
 
@@ -18,6 +19,43 @@ namespace DeepseekAPILib
     {
         private readonly HttpClient _httpClient;
         private readonly JsonSerializerSettings _jsonSettings;
+
+        /// <summary>
+        /// Tests the API connection
+        /// </summary>
+        public async Task<bool> TestConnectionAsync()
+        {
+            try
+            {
+                var testRequest = new ChatRequest
+                {
+                    Model = "deepseek-chat",
+                    Messages = new List<ChatMessage>
+            {
+                new ChatMessage("user", "Hello")
+            },
+                    MaxTokens = 1 // Минимальный запрос для теста
+                };
+
+                var response = await SendChatAsync(testRequest);
+                return response?.Choices != null;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Gets detailed connection info
+        /// </summary>
+        public string GetConnectionInfo()
+        {
+            return $"BaseUrl: {BaseUrl}, " +
+                   $"HasApiKey: {!string.IsNullOrEmpty(ApiKey)}, " +
+                   $"KeyLength: {ApiKey?.Length ?? 0}, " +
+                   $"Timeout: {TimeoutSeconds}s";
+        }
 
         /// <summary>
         /// Gets or sets the API key
@@ -46,7 +84,7 @@ namespace DeepseekAPILib
 
             ApiKey = apiKey.Trim();
 
-            _jsonSettings = new JsonSerializerSettings // ИНИЦИАЛИЗИРУЕМ здесь
+            _jsonSettings = new JsonSerializerSettings
             {
                 NullValueHandling = NullValueHandling.Ignore,
                 Formatting = Formatting.None
@@ -63,7 +101,13 @@ namespace DeepseekAPILib
                 _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ApiKey}");
             }
 
+            // ВАЖНО: Добавляем User-Agent
             _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("DeepSeekAPILib/1.0 (+https://github.com)");
+
+            // Также можно добавить другие headers для совместимости
+            _httpClient.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate");
+            _httpClient.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
         }
 
         /// <summary>
