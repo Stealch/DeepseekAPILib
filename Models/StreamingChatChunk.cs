@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
 
+// Models\StreamingChatChunk.cs
+
 namespace DeepseekAPILib.Models
 {
     public class StreamingChatChunk

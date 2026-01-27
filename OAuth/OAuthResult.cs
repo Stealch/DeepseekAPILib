@@ -1,5 +1,7 @@
 ﻿using System;
 
+// OAuth\OAuthResult.cs
+
 namespace DeepseekAPILib.OAuth
 {
     /// <summary>

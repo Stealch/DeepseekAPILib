@@ -1,4 +1,6 @@
-﻿namespace DeepseekAPILib
+﻿// ChatMessage.cs
+
+namespace DeepseekAPILib
 {
     /// <summary>
     /// Represents a message in a chat conversation

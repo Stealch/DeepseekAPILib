@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
 
+// Models\StreamingCompletionChunk.cs
+
 namespace DeepseekAPILib.Models
 {
     public class StreamingCompletionChunk

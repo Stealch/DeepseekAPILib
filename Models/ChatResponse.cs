@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
 
+// Models\ChatResponse.cs
+
 namespace DeepseekAPILib.Models
 {
     /// <summary>

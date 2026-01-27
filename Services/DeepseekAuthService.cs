@@ -5,6 +5,8 @@ using System.Text; // Добавлено
 using System.Threading;
 using System.Threading.Tasks;
 
+// Services\DeepseekAuthService.cs
+
 namespace DeepseekAPILib.Services
 {
     public class DeepseekAuthService : IDisposable

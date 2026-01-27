@@ -7,6 +7,8 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
+// DeepSeekAPI.cs
+
 namespace DeepseekAPILib
 {
     /// <summary>
@@ -39,23 +41,29 @@ namespace DeepseekAPILib
         /// <exception cref="ArgumentException">Thrown when apiKey is null or empty</exception>
         public DeepSeekAPI(string apiKey)
         {
-            if (string.IsNullOrEmpty(apiKey))
-                throw new ArgumentException("API key cannot be null or empty", nameof(apiKey));
+            if (apiKey == null)
+                throw new ArgumentNullException(nameof(apiKey));
 
-            ApiKey = apiKey;
+            ApiKey = apiKey.Trim();
+
+            _jsonSettings = new JsonSerializerSettings // ИНИЦИАЛИЗИРУЕМ здесь
+            {
+                NullValueHandling = NullValueHandling.Ignore,
+                Formatting = Formatting.None
+            };
 
             _httpClient = new HttpClient
             {
                 Timeout = TimeSpan.FromSeconds(TimeoutSeconds)
             };
-            _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ApiKey}");
-            _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
 
-            _jsonSettings = new JsonSerializerSettings
+            // Добавляем Authorization header только если ключ не пустой
+            if (!string.IsNullOrEmpty(ApiKey))
             {
-                NullValueHandling = NullValueHandling.Ignore,
-                Formatting = Formatting.None
-            };
+                _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ApiKey}");
+            }
+
+            _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
         }
 
         /// <summary>
@@ -63,7 +71,7 @@ namespace DeepseekAPILib
         /// </summary>
         /// <param name="apiKey">API key for authentication</param>
         /// <param name="baseUrl">Custom base URL</param>
-        public DeepSeekAPI(string apiKey, string baseUrl) : this(apiKey)
+        public DeepSeekAPI(string apiKey, string baseUrl) : this(apiKey) // Вызываем основной конструктор
         {
             if (!string.IsNullOrEmpty(baseUrl))
                 BaseUrl = baseUrl.TrimEnd('/');
@@ -150,7 +158,14 @@ namespace DeepseekAPILib
             };
 
             var response = await SendChatAsync(request);
-            return response?.Choices?.FirstOrDefault()?.Message?.Content?.Trim() ?? string.Empty;
+
+            // Проверяем наличие ответа
+            if (response?.Choices == null || response.Choices.Count == 0)
+                return string.Empty;
+
+            // Безопасное получение контента
+            var choice = response.Choices.FirstOrDefault();
+            return choice?.Message?.Content?.Trim() ?? string.Empty;
         }
 
         /// <summary>
@@ -173,6 +188,13 @@ namespace DeepseekAPILib
             var errorMessage = apiError?.Error?.Message ?? $"API request failed with status code: {(int)response.StatusCode}";
             var errorType = apiError?.Error?.Type;
             var errorCode = apiError?.Error?.Code;
+
+            // Добавляем информацию о наличии ключа
+            var authInfo = string.IsNullOrEmpty(ApiKey)
+                ? " (anonymous access)"
+                : " (with API key)";
+
+            errorMessage += authInfo;
 
             throw new Models.DeepseekApiException(errorMessage, (int)response.StatusCode, errorType, errorCode);
         }

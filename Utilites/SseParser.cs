@@ -1,4 +1,6 @@
-﻿namespace DeepseekAPILib.Utilities
+﻿// Utilites\SseParser.cs
+
+namespace DeepseekAPILib.Utilities
 {
     public static class SseParser
     {

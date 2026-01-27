@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
 
+// Models\CompletionRequest.cs
+
 namespace DeepseekAPILib.Models
 {
     /// <summary>

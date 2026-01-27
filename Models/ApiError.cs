@@ -1,5 +1,7 @@
 ﻿using System;
 
+// Models\ApiErrors.cs
+
 namespace DeepseekAPILib.Models
 {
     /// <summary>

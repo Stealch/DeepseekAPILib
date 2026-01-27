@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 
+// IDeepSeekClient.cs
+
 namespace DeepseekAPILib
 {
     public interface IDeepSeekClient
