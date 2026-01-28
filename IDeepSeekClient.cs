@@ -1,10 +1,11 @@
 ﻿// IDeepSeekClient.cs - обновить
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace DeepseekAPILib
 {
-    public interface IDeepSeekClient
+    public interface IDeepSeekClient : IDisposable
     {
         // Изменяем на get; set; (было только get?)
         string ApiKey { get; set; }
