@@ -1,16 +1,14 @@
-﻿using Newtonsoft.Json;
+﻿// DeepSeekAPI.cs
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using DeepseekAPILib.Models;
-
-// DeepSeekAPI.cs
 
 namespace DeepseekAPILib
 {
@@ -23,45 +21,8 @@ namespace DeepseekAPILib
 
         static DeepSeekAPI()
         {
-            // Устанавливаем TLS 1.2 и TLS 1.3 глобально
+            // Минимальная настройка TLS
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
-        }
-
-        /// <summary>
-        /// Tests the API connection
-        /// </summary>
-        public async Task<bool> TestConnectionAsync()
-        {
-            try
-            {
-                var testRequest = new ChatRequest
-                {
-                    Model = "deepseek-chat",
-                    Messages = new List<ChatMessage>
-                    {
-                        new ChatMessage("user", "Hello")
-                    },
-                    MaxTokens = 1 // Минимальный запрос для теста
-                };
-
-                var response = await SendChatAsync(testRequest);
-                return response?.Choices != null;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Gets detailed connection info
-        /// </summary>
-        public string GetConnectionInfo()
-        {
-            return $"BaseUrl: {BaseUrl}, " +
-                   $"HasApiKey: {!string.IsNullOrEmpty(ApiKey)}, " +
-                   $"KeyLength: {ApiKey?.Length ?? 0}, " +
-                   $"Timeout: {TimeoutSeconds}s";
         }
 
         /// <summary>
@@ -72,50 +33,31 @@ namespace DeepseekAPILib
             if (apiKey == null)
                 throw new ArgumentNullException(nameof(apiKey));
 
-            // ========== НАЧАЛО: КРИПТОГРАФИЧЕСКИЕ НАСТРОЙКИ ==========
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
-
-            try
-            {
-                ServicePointManager.Expect100Continue = true;
-                ServicePointManager.CheckCertificateRevocationList = false;
-                ServicePointManager.DefaultConnectionLimit = 9999;
-            }
-            catch { /* Игнорируем ошибки, если не поддерживается */ }
-            // ========== КОНЕЦ: КРИПТОГРАФИЧЕСКИЕ НАСТРОЙКИ ==========
-
-            // Настройка HttpClientHandler
+            // Простой HttpClientHandler - доверяем системе
             var handler = new HttpClientHandler
             {
-                SslProtocols = System.Security.Authentication.SslProtocols.Tls12 |
-                              System.Security.Authentication.SslProtocols.Tls13,
+                // Используем настройки системы по умолчанию
                 ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) =>
                 {
-                    if (sslPolicyErrors != System.Net.Security.SslPolicyErrors.None)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[SSL] Certificate error: {sslPolicyErrors}");
-                    }
-                    return true;
-                },
-                UseDefaultCredentials = false,
-                AllowAutoRedirect = true,
-                AutomaticDecompression = System.Net.DecompressionMethods.GZip |
-                                        System.Net.DecompressionMethods.Deflate
+                    // Базовая проверка, доверяем системным сертификатам
+                    return sslPolicyErrors == System.Net.Security.SslPolicyErrors.None;
+                }
             };
 
             _httpClient = new HttpClient(handler)
             {
-                Timeout = TimeSpan.FromSeconds(TimeoutSeconds),
-                BaseAddress = new Uri(BaseUrl)
+                Timeout = TimeSpan.FromSeconds(TimeoutSeconds)
             };
 
-            // Добавляем Authorization header только если ключ не пустой
-            if (!string.IsNullOrEmpty(ApiKey))
+            // Не устанавливаем BaseAddress, используем полные URL
+
+            // Authorization header
+            if (!string.IsNullOrEmpty(ApiKey) && ApiKey != " ")
             {
                 _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ApiKey}");
             }
 
-            // Accept header для JSON API
+            // Accept header
             _httpClient.DefaultRequestHeaders.Accept.Clear();
             _httpClient.DefaultRequestHeaders.Accept.Add(
                 new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json")
@@ -126,7 +68,7 @@ namespace DeepseekAPILib
         }
 
         /// <summary>
-        /// Creates a new instance of DeepSeekAPI with custom base URL
+        /// Creates a new instance with custom base URL
         /// </summary>
         public DeepSeekAPI(string apiKey, string baseUrl) : this(apiKey)
         {
@@ -175,38 +117,15 @@ namespace DeepseekAPILib
 
             string url = $"{BaseUrl}/v1/chat/completions";
 
-            try
+            var response = await _httpClient.PostAsync(url, content);
+
+            if (!response.IsSuccessStatusCode)
             {
-                var response = await _httpClient.PostAsync(url, content);
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    await HandleErrorResponse(response);
-                }
-
-                var responseJson = await response.Content.ReadAsStringAsync();
-                return JsonConvert.DeserializeObject<Models.ChatResponse>(responseJson);
+                await HandleErrorResponse(response);
             }
-            catch (HttpRequestException httpEx)
-            {
-                var errorDetails = new StringBuilder();
-                errorDetails.AppendLine($"HTTP Request failed to: {url}");
-                errorDetails.AppendLine($"TLS Protocols: {ServicePointManager.SecurityProtocol}");
-                errorDetails.AppendLine($"Has API Key: {!string.IsNullOrEmpty(ApiKey)}");
 
-                if (httpEx.InnerException is System.Net.WebException webEx)
-                {
-                    errorDetails.AppendLine($"WebException Status: {webEx.Status}");
-
-                    if (webEx.Status == WebExceptionStatus.SecureChannelFailure)
-                    {
-                        errorDetails.AppendLine($"SECURE CHANNEL FAILURE - TLS 1.2 may not be enabled.");
-                        errorDetails.AppendLine($"Current protocols: {ServicePointManager.SecurityProtocol}");
-                    }
-                }
-
-                throw new HttpRequestException(errorDetails.ToString(), httpEx);
-            }
+            var responseJson = await response.Content.ReadAsStringAsync();
+            return JsonConvert.DeserializeObject<Models.ChatResponse>(responseJson);
         }
 
         /// <summary>
@@ -245,10 +164,10 @@ namespace DeepseekAPILib
         private string BuildDetailedErrorMessage(HttpResponseMessage response, string errorJson)
         {
             var message = new StringBuilder();
-            message.AppendLine($"Запрос к {response.RequestMessage.RequestUri} завершился с ошибкой {response.StatusCode}.");
-            message.AppendLine($"Код статуса: {(int)response.StatusCode}");
-            message.AppendLine($"Тело ответа: {errorJson}");
-            message.Append($"Режим доступа: {(string.IsNullOrEmpty(ApiKey) ? "анонимный" : "с API ключом")}");
+            message.AppendLine($"Request to {response.RequestMessage.RequestUri} failed with {response.StatusCode}.");
+            message.AppendLine($"Status code: {(int)response.StatusCode}");
+            message.AppendLine($"Response: {errorJson}");
+            message.Append($"Access mode: {(string.IsNullOrEmpty(ApiKey) ? "anonymous" : "with API key")}");
 
             return message.ToString();
         }

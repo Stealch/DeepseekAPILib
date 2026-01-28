@@ -7,47 +7,176 @@ namespace DeepseekAPILib
     public static class ProtocolDetector
     {
         /// <summary>
-        /// Проверяет, является ли Windows 8.1 или новее (поддерживает TLS 1.2 с GCM)
+        /// Определяет версию Windows через реестр
+        /// Возвращает кортеж: (Major, Minor, Build, IsServer)
         /// </summary>
-        public static bool IsWindows8_1OrNewer()
+        public static (int Major, int Minor, int Build, bool IsServer) GetWindowsVersion()
         {
             if (Environment.OSVersion.Platform != PlatformID.Win32NT)
-                return false; // Только для Windows
+                return (0, 0, 0, false);
 
             try
             {
                 using var key = Registry.LocalMachine.OpenSubKey(
                     @"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
+
                 if (key == null)
-                    return false;
+                    return (0, 0, 0, false);
 
-                // 1. Проверяем Windows 10+
+                // Определяем серверная ли ОС
+                var productName = key.GetValue("ProductName") as string ?? "";
+                bool isServer = productName.Contains("Server");
+
+                // Windows 10+
                 var major = key.GetValue("CurrentMajorVersionNumber") as int?;
-                if (major.HasValue && major.Value >= 10)
-                    return true;
+                var minor = key.GetValue("CurrentMinorVersionNumber") as int?;
 
-                // 2. Проверяем Windows 8.1 по ProductName
-                var productName = key.GetValue("ProductName") as string;
-                if (productName == null)
-                    return false;
+                if (major.HasValue && minor.HasValue)
+                {
+                    var buildStr = key.GetValue("CurrentBuildNumber") as string;
+                    int.TryParse(buildStr, out int build);
+                    return (major.Value, minor.Value, build, isServer);
+                }
 
-                if (!productName.Contains("Windows 8.1"))
-                    return false; // Не Windows 8.1
+                // Старые версии через ProductName
+                if (productName.Contains("Windows 8.1"))
+                {
+                    var buildStr = key.GetValue("CurrentBuildNumber") as string;
+                    int.TryParse(buildStr, out int build);
+                    return (6, 3, build, isServer);
+                }
 
-                // 3. Для Windows 8.1 проверяем build >= 9600
-                var buildStr = key.GetValue("CurrentBuildNumber") as string;
-                if (string.IsNullOrEmpty(buildStr))
-                    return false;
+                if (productName.Contains("Windows 8") && !productName.Contains("8.1"))
+                {
+                    return (6, 2, 9200, isServer);
+                }
 
-                if (!int.TryParse(buildStr, out int build))
-                    return false;
+                if (productName.Contains("Windows 7"))
+                {
+                    return (6, 1, 7601, isServer);
+                }
 
-                return build >= 9600; // Windows 8.1 RTM = 9600
+                return (0, 0, 0, isServer);
             }
             catch
             {
-                return false; // При ошибке - считаем что старая Windows
+                return (0, 0, 0, false);
             }
+        }
+
+        /// <summary>
+        /// Проверяет, включен ли TLS 1.2 в реестре
+        /// </summary>
+        public static bool IsTls12EnabledInRegistry()
+        {
+            try
+            {
+                // Client protocols
+                using var clientKey = Registry.LocalMachine.OpenSubKey(
+                    @"SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client");
+
+                if (clientKey == null)
+                    return false;
+
+                var enabled = clientKey.GetValue("Enabled") as int?;
+                var disabledByDefault = clientKey.GetValue("DisabledByDefault") as int?;
+
+                bool clientEnabled = (enabled.HasValue && enabled.Value == 1) ||
+                                     (!disabledByDefault.HasValue || disabledByDefault.Value == 0);
+
+                if (!clientEnabled)
+                    return false;
+
+                // Server protocols (для Server ОС)
+                using var serverKey = Registry.LocalMachine.OpenSubKey(
+                    @"SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Server");
+
+                if (serverKey != null)
+                {
+                    var serverEnabledValue = serverKey.GetValue("Enabled") as int?;
+                    var serverDisabledByDefault = serverKey.GetValue("DisabledByDefault") as int?;
+
+                    bool serverEnabled = (serverEnabledValue.HasValue && serverEnabledValue.Value == 1) ||
+                                         (!serverDisabledByDefault.HasValue || serverDisabledByDefault.Value == 0);
+
+                    if (!serverEnabled)
+                        return false;
+                }
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Определяет, можно ли использовать HttpClient для DeepSeek API
+        /// </summary>
+        public static bool CanUseHttpClient()
+        {
+            var version = GetWindowsVersion();
+
+            // Не Windows или ошибка определения
+            if (version.Major == 0)
+                return false;
+
+            // Windows 10+ (10.0) - всегда можно, GCM включен по умолчанию
+            if (version.Major >= 10)
+                return true;
+
+            // Windows 7/Server 2008 R2 (6.1) - нельзя, нет GCM шифра
+            if (version.Major == 6 && version.Minor == 1)
+                return false;
+
+            // Windows 8/Server 2012 (6.2) - нельзя, нет GCM шифра
+            if (version.Major == 6 && version.Minor == 2)
+                return false;
+
+            // Windows 8.1/Server 2012 R2 (6.3) - проверяем включен ли TLS 1.2
+            if (version.Major == 6 && version.Minor == 3)
+                return IsTls12EnabledInRegistry();
+
+            // Неизвестная/экзотическая версия - предполагаем нельзя
+            return false;
+        }
+
+        /// <summary>
+        /// Получает информацию о системе для логов/UI
+        /// </summary>
+        public static string GetSystemInfo()
+        {
+            var version = GetWindowsVersion();
+            bool canUseHttpClient = CanUseHttpClient();
+            bool tlsEnabled = IsTls12EnabledInRegistry();
+
+            if (version.Major == 0)
+                return "Не удалось определить версию Windows";
+
+            string versionName = version switch
+            {
+                (10, _, _, false) => "Windows 10+",
+                (6, 3, _, false) => "Windows 8.1",
+                (6, 2, _, false) => "Windows 8",
+                (6, 1, _, false) => "Windows 7",
+                (6, 3, _, true) => "Windows Server 2012 R2",
+                (6, 2, _, true) => "Windows Server 2012",
+                (6, 1, _, true) => "Windows Server 2008 R2",
+                _ => $"Windows {version.Major}.{version.Minor}"
+            };
+
+            return $"{versionName} (Build {version.Build}), " +
+                   $"TLS 1.2: {(tlsEnabled ? "Включен" : "Выключен")}, " +
+                   $"Рекомендуемый клиент: {(canUseHttpClient ? "HttpClient" : "libcurl")}";
+        }
+
+        // Обратная совместимость (если где-то используется)
+        public static bool IsWindows8_1OrNewer()
+        {
+            var version = GetWindowsVersion();
+            return (version.Major == 6 && version.Minor == 3 && version.Build >= 9600) ||
+                   version.Major >= 10;
         }
     }
 
