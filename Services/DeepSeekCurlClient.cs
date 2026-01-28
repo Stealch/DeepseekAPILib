@@ -21,11 +21,21 @@ namespace DeepseekAPILib
 
         public DeepSeekCurlClient(string apiKey) : base(apiKey)
         {
-            if (string.IsNullOrWhiteSpace(apiKey))
-                apiKey = " ";
+            try
+            {
+                LibCurlLoader.EnsureLoaded(); // Может бросить DllNotFoundException
 
-            _session = new CurlSession();
-            ConfigureCurlSession();
+                _session = new CurlSession();
+                ConfigureCurlSession();
+            }
+            catch (DllNotFoundException dllEx)
+            {
+                throw new Exception($"libcurl-x86.dll not found or failed to load: {dllEx.Message}", dllEx);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Failed to initialize Curl client: {ex.Message}", ex);
+            }
         }
 
         private void ConfigureCurlSession()

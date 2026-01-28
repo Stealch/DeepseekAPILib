@@ -152,46 +152,46 @@ namespace DeepseekAPILib.Curl
         private static void ExtractEmbeddedLibCurl()
         {
             var assembly = Assembly.GetExecutingAssembly();
-
-            // Получаем ВСЕ embedded ресурсы
             var allResources = assembly.GetManifestResourceNames();
 
-            if (allResources.Length == 0)
-                throw new FileNotFoundException("No embedded resources found in assembly");
+            // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: IntPtr.Size для 32-bit процесса = 4
+            bool is64BitProcess = IntPtr.Size == 8; // false для 32-bit VS
+            string targetDllName = is64BitProcess ? "libcurl-x64.dll" : "libcurl-x86.dll";
 
-            // Ищем libcurl (разные варианты имен)
-            string resourceName = null;
+            // Логируем для отладки
+            string debugInfo = $"Process: {(is64BitProcess ? "x64" : "x86")}, " +
+                              $"Looking for: {targetDllName}, " +
+                              $"Resources: {string.Join(", ", allResources)}";
 
-            // Вариант 1: Точное имя (после ILRepack может быть с неймспейсом)
-            resourceName = allResources.FirstOrDefault(r =>
-                r.EndsWith(".libcurl-x64.dll", StringComparison.OrdinalIgnoreCase));
+            // Сохраняем для возможного отображения ошибки
+            string searchInfo = debugInfo;
 
-            // Вариант 2: Частичное совпадение
+            // Ищем нужную DLL
+            string resourceName = allResources.FirstOrDefault(r =>
+                r.EndsWith("." + targetDllName, StringComparison.OrdinalIgnoreCase));
+
             if (resourceName == null)
             {
+                // Fallback: ищем любой libcurl
                 resourceName = allResources.FirstOrDefault(r =>
                     r.IndexOf("libcurl", StringComparison.OrdinalIgnoreCase) >= 0);
             }
 
-            // Вариант 3: Первый ресурс
-            if (resourceName == null && allResources.Length > 0)
+            if (resourceName == null)
             {
-                resourceName = allResources[0];
+                throw new DllNotFoundException(
+                    $"libcurl for {(is64BitProcess ? "x64" : "x86")} process not found. " +
+                    searchInfo);
             }
 
-            if (resourceName == null)
-                throw new FileNotFoundException($"libcurl resource not found. Resources: {string.Join(", ", allResources)}");
+            _tempDllPath = Path.Combine(_tempFolderPath, targetDllName);
 
-            _tempDllPath = Path.Combine(_tempFolderPath, "libcurl-x64.dll");
-
-            // Извлекаем DLL
             using var resourceStream = assembly.GetManifestResourceStream(resourceName);
             if (resourceStream == null)
-                throw new FileNotFoundException($"Cannot open resource: {resourceName}");
+                throw new FileNotFoundException($"Cannot open: {resourceName}");
 
             using var fileStream = File.Create(_tempDllPath);
             resourceStream.CopyTo(fileStream);
-            fileStream.Flush();
         }
 
         private static void LoadNativeLibrary()
@@ -281,10 +281,20 @@ namespace DeepseekAPILib.Curl
             }
         }
 
-        /// <summary>
-        /// Явная очистка всех сессий (вызывать при запуске приложения)
-        /// </summary>
-        public static void CleanupAllSessions()
+        public static string GetDebugInfo()
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            var resources = assembly.GetManifestResourceNames();
+
+            return $"Process: {(IntPtr.Size == 8 ? "x64" : "x86")} (IntPtr.Size={IntPtr.Size}), " +
+                   $"OS: {Environment.Is64BitOperatingSystem}, " +
+                   $"Resources: {string.Join(", ", resources)}";
+        }
+
+            /// <summary>
+            /// Явная очистка всех сессий (вызывать при запуске приложения)
+            /// </summary>
+            public static void CleanupAllSessions()
         {
             CleanupCurrentSession();
             CleanupPreviousSessions();

@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
+
 // Models\CurlSession.cs
 
 namespace DeepseekAPILib.Curl
@@ -359,7 +360,30 @@ namespace DeepseekAPILib.Curl
 
         ~CurlSession()
         {
-            Dispose();
+            // НЕ вызываем Dispose(false) - финализатор должен быть простым
+
+            // Только освобождение нативных ресурсов
+            if (_curlHandle != IntPtr.Zero)
+            {
+                NativeMethods.curl_easy_cleanup(_curlHandle);
+                _curlHandle = IntPtr.Zero;
+            }
+
+            if (_headersList != IntPtr.Zero)
+            {
+                NativeMethods.curl_slist_free_all(_headersList);
+                _headersList = IntPtr.Zero;
+            }
+
+            if (_callbackHandle.IsAllocated)
+            {
+                _callbackHandle.Free();
+            }
+
+            if (_streamingCallbackHandle.IsAllocated)
+            {
+                _streamingCallbackHandle.Free();
+            }
         }
     }
 }

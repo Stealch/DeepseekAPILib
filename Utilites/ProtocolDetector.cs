@@ -1,6 +1,7 @@
 ﻿// Utilites\ProtocolDetector.cs
 using Microsoft.Win32;
 using System;
+using System.Text;
 
 namespace DeepseekAPILib
 {
@@ -169,6 +170,23 @@ namespace DeepseekAPILib
             return $"{versionName} (Build {version.Build}), " +
                    $"TLS 1.2: {(tlsEnabled ? "Включен" : "Выключен")}, " +
                    $"Рекомендуемый клиент: {(canUseHttpClient ? "HttpClient" : "libcurl")}";
+        }
+
+        public static string TestProtocolDetector()
+        {
+            var version = GetWindowsVersion();
+            bool tlsEnabled = IsTls12EnabledInRegistry();
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Detected OS: {version.Major}.{version.Minor}.{version.Build}");
+            sb.AppendLine($"IsWindows7: {version.Major == 6 && version.Minor == 1}");
+            sb.AppendLine($"IsWindows8: {version.Major == 6 && version.Minor == 2}");
+            sb.AppendLine($"IsWindows8.1: {version.Major == 6 && version.Minor == 3}");
+            sb.AppendLine($"IsWindows10+: {version.Major >= 10}");
+            sb.AppendLine($"TLS 1.2 in registry: {tlsEnabled}");
+            sb.AppendLine($"CanUseHttpClient: {CanUseHttpClient()}");
+
+            return sb.ToString();
         }
 
         // Обратная совместимость (если где-то используется)
