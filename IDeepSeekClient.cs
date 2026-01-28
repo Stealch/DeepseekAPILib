@@ -1,12 +1,12 @@
-﻿using System.Collections.Generic;
+﻿// IDeepSeekClient.cs - обновить
+using System.Collections.Generic;
 using System.Threading.Tasks;
-
-// IDeepSeekClient.cs
 
 namespace DeepseekAPILib
 {
     public interface IDeepSeekClient
     {
+        // Изменяем на get; set; (было только get?)
         string ApiKey { get; set; }
         string BaseUrl { get; set; }
         int TimeoutSeconds { get; set; }
@@ -14,11 +14,13 @@ namespace DeepseekAPILib
         Task<Models.CompletionResponse> SendCompletionAsync(Models.CompletionRequest request);
         Task<Models.ChatResponse> SendChatAsync(Models.ChatRequest request);
 
-        // Streaming методы - возвращают IAsyncEnumerable для постепенного получения данных
+        // Streaming методы
         IAsyncEnumerable<Models.StreamingChatChunk> SendChatStreamingAsync(Models.ChatRequest request);
         IAsyncEnumerable<Models.StreamingCompletionChunk> SendCompletionStreamingAsync(Models.CompletionRequest request);
 
-        Task<string> SendCompletionSimpleAsync(string prompt, string model = "deepseek-coder", int maxTokens = 100, double temperature = 0.7);
-        Task<string> SendChatSimpleAsync(List<ChatMessage> messages, string model = "deepseek-chat", int maxTokens = 500, double temperature = 0.7);
+        Task<string> SendCompletionSimpleAsync(string prompt, string model = "deepseek-coder",
+            int maxTokens = 100, double temperature = 0.7);
+        Task<string> SendChatSimpleAsync(List<ChatMessage> messages, string model = "deepseek-chat",
+            int maxTokens = 500, double temperature = 0.7);
     }
 }

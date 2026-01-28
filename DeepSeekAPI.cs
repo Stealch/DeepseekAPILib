@@ -3,7 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using DeepseekAPILib.Models;
@@ -13,12 +15,17 @@ using DeepseekAPILib.Models;
 namespace DeepseekAPILib
 {
     /// <summary>
-    /// Client for Deepseek API
+    /// Client for Deepseek API using HttpClient
     /// </summary>
-    public class DeepSeekAPI : IDeepSeekClient, IDisposable
+    public class DeepSeekAPI : BaseDeepSeekClient
     {
         private readonly HttpClient _httpClient;
-        private readonly JsonSerializerSettings _jsonSettings;
+
+        static DeepSeekAPI()
+        {
+            // Устанавливаем TLS 1.2 и TLS 1.3 глобально
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
+        }
 
         /// <summary>
         /// Tests the API connection
@@ -31,9 +38,9 @@ namespace DeepseekAPILib
                 {
                     Model = "deepseek-chat",
                     Messages = new List<ChatMessage>
-            {
-                new ChatMessage("user", "Hello")
-            },
+                    {
+                        new ChatMessage("user", "Hello")
+                    },
                     MaxTokens = 1 // Минимальный запрос для теста
                 };
 
@@ -58,41 +65,48 @@ namespace DeepseekAPILib
         }
 
         /// <summary>
-        /// Gets or sets the API key
-        /// </summary>
-        public string ApiKey { get; set; }
-
-        /// <summary>
-        /// Gets or sets the base URL
-        /// </summary>
-        public string BaseUrl { get; set; } = "https://api.deepseek.com";
-
-        /// <summary>
-        /// Gets or sets the default timeout for requests in seconds
-        /// </summary>
-        public int TimeoutSeconds { get; set; } = 30;
-
-        /// <summary>
         /// Creates a new instance of DeepSeekAPI
         /// </summary>
-        /// <param name="apiKey">API key for authentication</param>
-        /// <exception cref="ArgumentException">Thrown when apiKey is null or empty</exception>
-        public DeepSeekAPI(string apiKey)
+        public DeepSeekAPI(string apiKey) : base(apiKey)
         {
             if (apiKey == null)
                 throw new ArgumentNullException(nameof(apiKey));
 
-            ApiKey = apiKey.Trim();
+            // ========== НАЧАЛО: КРИПТОГРАФИЧЕСКИЕ НАСТРОЙКИ ==========
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
 
-            _jsonSettings = new JsonSerializerSettings
+            try
             {
-                NullValueHandling = NullValueHandling.Ignore,
-                Formatting = Formatting.None
+                ServicePointManager.Expect100Continue = true;
+                ServicePointManager.CheckCertificateRevocationList = false;
+                ServicePointManager.DefaultConnectionLimit = 9999;
+            }
+            catch { /* Игнорируем ошибки, если не поддерживается */ }
+            // ========== КОНЕЦ: КРИПТОГРАФИЧЕСКИЕ НАСТРОЙКИ ==========
+
+            // Настройка HttpClientHandler
+            var handler = new HttpClientHandler
+            {
+                SslProtocols = System.Security.Authentication.SslProtocols.Tls12 |
+                              System.Security.Authentication.SslProtocols.Tls13,
+                ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) =>
+                {
+                    if (sslPolicyErrors != System.Net.Security.SslPolicyErrors.None)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[SSL] Certificate error: {sslPolicyErrors}");
+                    }
+                    return true;
+                },
+                UseDefaultCredentials = false,
+                AllowAutoRedirect = true,
+                AutomaticDecompression = System.Net.DecompressionMethods.GZip |
+                                        System.Net.DecompressionMethods.Deflate
             };
 
-            _httpClient = new HttpClient
+            _httpClient = new HttpClient(handler)
             {
-                Timeout = TimeSpan.FromSeconds(TimeoutSeconds)
+                Timeout = TimeSpan.FromSeconds(TimeoutSeconds),
+                BaseAddress = new Uri(BaseUrl)
             };
 
             // Добавляем Authorization header только если ключ не пустой
@@ -101,21 +115,20 @@ namespace DeepseekAPILib
                 _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ApiKey}");
             }
 
-            // ВАЖНО: Добавляем User-Agent
-            _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("DeepSeekAPILib/1.0 (+https://github.com)");
+            // Accept header для JSON API
+            _httpClient.DefaultRequestHeaders.Accept.Clear();
+            _httpClient.DefaultRequestHeaders.Accept.Add(
+                new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json")
+            );
 
-            // Также можно добавить другие headers для совместимости
-            _httpClient.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate");
-            _httpClient.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
+            // User-Agent
+            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("DeepSeekAPILib/1.0");
         }
 
         /// <summary>
         /// Creates a new instance of DeepSeekAPI with custom base URL
         /// </summary>
-        /// <param name="apiKey">API key for authentication</param>
-        /// <param name="baseUrl">Custom base URL</param>
-        public DeepSeekAPI(string apiKey, string baseUrl) : this(apiKey) // Вызываем основной конструктор
+        public DeepSeekAPI(string apiKey, string baseUrl) : this(apiKey)
         {
             if (!string.IsNullOrEmpty(baseUrl))
                 BaseUrl = baseUrl.TrimEnd('/');
@@ -124,7 +137,7 @@ namespace DeepseekAPILib
         /// <summary>
         /// Sends a completion request
         /// </summary>
-        public async Task<Models.CompletionResponse> SendCompletionAsync(Models.CompletionRequest request)
+        public override async Task<Models.CompletionResponse> SendCompletionAsync(Models.CompletionRequest request)
         {
             if (request == null)
                 throw new ArgumentNullException(nameof(request));
@@ -149,7 +162,7 @@ namespace DeepseekAPILib
         /// <summary>
         /// Sends a chat completion request
         /// </summary>
-        public async Task<Models.ChatResponse> SendChatAsync(Models.ChatRequest request)
+        public override async Task<Models.ChatResponse> SendChatAsync(Models.ChatRequest request)
         {
             if (request == null)
                 throw new ArgumentNullException(nameof(request));
@@ -160,56 +173,40 @@ namespace DeepseekAPILib
             var jsonContent = JsonConvert.SerializeObject(request, _jsonSettings);
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync($"{BaseUrl}/v1/chat/completions", content);
+            string url = $"{BaseUrl}/v1/chat/completions";
 
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                await HandleErrorResponse(response);
+                var response = await _httpClient.PostAsync(url, content);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    await HandleErrorResponse(response);
+                }
+
+                var responseJson = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<Models.ChatResponse>(responseJson);
             }
-
-            var responseJson = await response.Content.ReadAsStringAsync();
-            return JsonConvert.DeserializeObject<Models.ChatResponse>(responseJson);
-        }
-
-        /// <summary>
-        /// Sends a simple completion request
-        /// </summary>
-        public async Task<string> SendCompletionSimpleAsync(string prompt, string model = "deepseek-coder", int maxTokens = 100, double temperature = 0.7)
-        {
-            var request = new Models.CompletionRequest
+            catch (HttpRequestException httpEx)
             {
-                Model = model,
-                Prompt = prompt,
-                MaxTokens = maxTokens,
-                Temperature = temperature
-            };
+                var errorDetails = new StringBuilder();
+                errorDetails.AppendLine($"HTTP Request failed to: {url}");
+                errorDetails.AppendLine($"TLS Protocols: {ServicePointManager.SecurityProtocol}");
+                errorDetails.AppendLine($"Has API Key: {!string.IsNullOrEmpty(ApiKey)}");
 
-            var response = await SendCompletionAsync(request);
-            return response?.Choices?.FirstOrDefault()?.Text?.Trim() ?? string.Empty;
-        }
+                if (httpEx.InnerException is System.Net.WebException webEx)
+                {
+                    errorDetails.AppendLine($"WebException Status: {webEx.Status}");
 
-        /// <summary>
-        /// Sends a simple chat request
-        /// </summary>
-        public async Task<string> SendChatSimpleAsync(List<ChatMessage> messages, string model = "deepseek-chat", int maxTokens = 500, double temperature = 0.7)
-        {
-            var request = new Models.ChatRequest
-            {
-                Model = model,
-                Messages = messages,
-                MaxTokens = maxTokens,
-                Temperature = temperature
-            };
+                    if (webEx.Status == WebExceptionStatus.SecureChannelFailure)
+                    {
+                        errorDetails.AppendLine($"SECURE CHANNEL FAILURE - TLS 1.2 may not be enabled.");
+                        errorDetails.AppendLine($"Current protocols: {ServicePointManager.SecurityProtocol}");
+                    }
+                }
 
-            var response = await SendChatAsync(request);
-
-            // Проверяем наличие ответа
-            if (response?.Choices == null || response.Choices.Count == 0)
-                return string.Empty;
-
-            // Безопасное получение контента
-            var choice = response.Choices.FirstOrDefault();
-            return choice?.Message?.Content?.Trim() ?? string.Empty;
+                throw new HttpRequestException(errorDetails.ToString(), httpEx);
+            }
         }
 
         /// <summary>
@@ -218,85 +215,90 @@ namespace DeepseekAPILib
         private async Task HandleErrorResponse(HttpResponseMessage response)
         {
             var errorJson = await response.Content.ReadAsStringAsync();
-            Models.ApiError apiError = null;
+
+            string errorMessage;
+            string errorType = null;
+            string errorCode = null;
 
             try
             {
-                apiError = JsonConvert.DeserializeObject<Models.ApiError>(errorJson);
+                var apiError = JsonConvert.DeserializeObject<ApiError>(errorJson);
+                if (apiError?.Error != null)
+                {
+                    errorMessage = apiError.Error.Message;
+                    errorType = apiError.Error.Type;
+                    errorCode = apiError.Error.Code;
+                }
+                else
+                {
+                    errorMessage = BuildDetailedErrorMessage(response, errorJson);
+                }
             }
             catch
             {
-                // If we can't parse the error JSON, use generic error
+                errorMessage = BuildDetailedErrorMessage(response, errorJson);
             }
 
-            var errorMessage = apiError?.Error?.Message ?? $"API request failed with status code: {(int)response.StatusCode}";
-            var errorType = apiError?.Error?.Type;
-            var errorCode = apiError?.Error?.Code;
-
-            // Добавляем информацию о наличии ключа
-            var authInfo = string.IsNullOrEmpty(ApiKey)
-                ? " (anonymous access)"
-                : " (with API key)";
-
-            errorMessage += authInfo;
-
-            throw new Models.DeepseekApiException(errorMessage, (int)response.StatusCode, errorType, errorCode);
+            throw new DeepseekApiException(errorMessage, (int)response.StatusCode, errorType, errorCode);
         }
+
+        private string BuildDetailedErrorMessage(HttpResponseMessage response, string errorJson)
+        {
+            var message = new StringBuilder();
+            message.AppendLine($"Запрос к {response.RequestMessage.RequestUri} завершился с ошибкой {response.StatusCode}.");
+            message.AppendLine($"Код статуса: {(int)response.StatusCode}");
+            message.AppendLine($"Тело ответа: {errorJson}");
+            message.Append($"Режим доступа: {(string.IsNullOrEmpty(ApiKey) ? "анонимный" : "с API ключом")}");
+
+            return message.ToString();
+        }
+
         /// <summary>
         /// Sends a streaming chat completion request
         /// </summary>
-        public IAsyncEnumerable<Models.StreamingChatChunk> SendChatStreamingAsync(
+        public override async IAsyncEnumerable<Models.StreamingChatChunk> SendChatStreamingAsync(
             Models.ChatRequest request)
         {
-            if (request == null)
-                throw new ArgumentNullException(nameof(request));
+            request.Stream = true;
 
-            return SendChatStreamingAsync2();
+            var jsonContent = JsonConvert.SerializeObject(request, _jsonSettings);
+            using var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-            async IAsyncEnumerable<Models.StreamingChatChunk> SendChatStreamingAsync2()
+            using var response = await _httpClient.PostAsync($"{BaseUrl}/v1/chat/completions", content);
+
+            if (!response.IsSuccessStatusCode)
             {
-                request.Stream = true;
+                await HandleErrorResponse(response);
+                yield break;
+            }
 
-                var jsonContent = JsonConvert.SerializeObject(request, _jsonSettings);
-                using var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+            using var stream = await response.Content.ReadAsStreamAsync();
+            using var reader = new StreamReader(stream);
 
-                using var response = await _httpClient.PostAsync($"{BaseUrl}/v1/chat/completions", content);
+            while (!reader.EndOfStream)
+            {
+                var line = await reader.ReadLineAsync();
+                if (string.IsNullOrEmpty(line))
+                    continue;
 
-                if (!response.IsSuccessStatusCode)
+                if (line.StartsWith("data: "))
                 {
-                    await HandleErrorResponse(response);
-                    yield break;
-                }
+                    var json = line.Substring(6);
+                    if (json == "[DONE]")
+                        yield break;
 
-                using var stream = await response.Content.ReadAsStreamAsync();
-                using var reader = new StreamReader(stream);
-
-                while (!reader.EndOfStream)
-                {
-                    var line = await reader.ReadLineAsync();
-                    if (string.IsNullOrEmpty(line))
-                        continue;
-
-                    if (line.StartsWith("data: "))
+                    Models.StreamingChatChunk chunk;
+                    try
                     {
-                        var json = line.Substring(6);
-                        if (json == "[DONE]")
-                            yield break;
-
-                        Models.StreamingChatChunk chunk;
-                        try
-                        {
-                            chunk = JsonConvert.DeserializeObject<Models.StreamingChatChunk>(json);
-                        }
-                        catch (JsonException)
-                        {
-                            // Игнорируем некорректные JSON чанки
-                            continue;
-                        }
-
-                        if (chunk != null)
-                            yield return chunk;
+                        chunk = JsonConvert.DeserializeObject<StreamingChatChunk>(json);
                     }
+                    catch (JsonException)
+                    {
+                        continue;
+                    }
+
+                    if (chunk != null)
+                        yield return chunk;
                 }
             }
         }
@@ -304,66 +306,63 @@ namespace DeepseekAPILib
         /// <summary>
         /// Sends a streaming completion request
         /// </summary>
-        public IAsyncEnumerable<Models.StreamingCompletionChunk> SendCompletionStreamingAsync(
+        public override async IAsyncEnumerable<Models.StreamingCompletionChunk> SendCompletionStreamingAsync(
             Models.CompletionRequest request)
         {
-            if (request == null)
-                throw new ArgumentNullException(nameof(request));
+            request.Stream = true;
 
-            return SendCompletionStreamingAsync2();
+            var jsonContent = JsonConvert.SerializeObject(request, _jsonSettings);
+            using var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-            async IAsyncEnumerable<Models.StreamingCompletionChunk> SendCompletionStreamingAsync2()
+            using var response = await _httpClient.PostAsync($"{BaseUrl}/v1/completions", content);
+
+            if (!response.IsSuccessStatusCode)
             {
-                request.Stream = true;
+                await HandleErrorResponse(response);
+                yield break;
+            }
 
-                var jsonContent = JsonConvert.SerializeObject(request, _jsonSettings);
-                using var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+            using var stream = await response.Content.ReadAsStreamAsync();
+            using var reader = new StreamReader(stream);
 
-                using var response = await _httpClient.PostAsync($"{BaseUrl}/v1/completions", content);
+            while (!reader.EndOfStream)
+            {
+                var line = await reader.ReadLineAsync();
+                if (string.IsNullOrEmpty(line))
+                    continue;
 
-                if (!response.IsSuccessStatusCode)
+                if (line.StartsWith("data: "))
                 {
-                    await HandleErrorResponse(response);
-                    yield break;
-                }
+                    var json = line.Substring(6);
+                    if (json == "[DONE]")
+                        yield break;
 
-                using var stream = await response.Content.ReadAsStreamAsync();
-                using var reader = new StreamReader(stream);
-
-                while (!reader.EndOfStream)
-                {
-                    var line = await reader.ReadLineAsync();
-                    if (string.IsNullOrEmpty(line))
-                        continue;
-
-                    if (line.StartsWith("data: "))
+                    Models.StreamingCompletionChunk chunk;
+                    try
                     {
-                        var json = line.Substring(6);
-                        if (json == "[DONE]")
-                            yield break;
-
-                        Models.StreamingCompletionChunk chunk;
-                        try
-                        {
-                            chunk = JsonConvert.DeserializeObject<Models.StreamingCompletionChunk>(json);
-                        }
-                        catch (JsonException)
-                        {
-                            continue;
-                        }
-
-                        if (chunk != null)
-                            yield return chunk;
+                        chunk = JsonConvert.DeserializeObject<StreamingCompletionChunk>(json);
                     }
+                    catch (JsonException)
+                    {
+                        continue;
+                    }
+
+                    if (chunk != null)
+                        yield return chunk;
                 }
             }
         }
+
         /// <summary>
         /// Disposes the HttpClient
         /// </summary>
-        public void Dispose()
+        protected override void Dispose(bool disposing)
         {
-            _httpClient?.Dispose();
+            if (disposing)
+            {
+                _httpClient?.Dispose();
+            }
+            base.Dispose(disposing);
         }
     }
 }

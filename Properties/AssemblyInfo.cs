@@ -1,13 +1,15 @@
 ﻿using System.Reflection;
 using System.Runtime.InteropServices;
 
+// Properties\AssemblyInfo.cs
+
 // Общие сведения об этой сборке предоставляются следующим набором
 // набора атрибутов. Измените значения этих атрибутов для изменения сведений,
 // связанные со сборкой.
 [assembly: AssemblyTitle("DeepseekAPILib")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
+[assembly: AssemblyCompany("Stealch")]
 [assembly: AssemblyProduct("DeepseekAPILib")]
 [assembly: AssemblyCopyright("Copyright ©  2026")]
 [assembly: AssemblyTrademark("")]
