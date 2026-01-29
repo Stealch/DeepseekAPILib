@@ -123,7 +123,7 @@ namespace DeepseekAPILib
         }
 
         // ============ STREAMING METHODS ============
-
+        #region STREAMING METHODS
         public override async IAsyncEnumerable<Models.StreamingChatChunk> SendChatStreamingAsync(
             Models.ChatRequest request)
         {
@@ -205,7 +205,7 @@ namespace DeepseekAPILib
                 }
             }
         }
-
+        #endregion
         protected override void Dispose(bool disposing)
         {
             if (disposing)

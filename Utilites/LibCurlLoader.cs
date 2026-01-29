@@ -50,7 +50,7 @@ namespace DeepseekAPILib.Curl
                 try
                 {
                     // 1. Очищаем старые сессии
-                    CleanupPreviousSessions();
+                   // CleanupPreviousSessions();
 
                     // 2. Создаем новую сессию
                     CreateSessionFolder();
@@ -64,7 +64,7 @@ namespace DeepseekAPILib.Curl
                     _isLoaded = true;
 
                     // 5. Регистрируем очистку при выходе
-                    RegisterCleanupOnExit();
+                   // RegisterCleanupOnExit();
                 }
                 catch (Exception ex)
                 {
@@ -154,10 +154,22 @@ namespace DeepseekAPILib.Curl
             var assembly = Assembly.GetExecutingAssembly();
             var allResources = assembly.GetManifestResourceNames();
 
-            // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: IntPtr.Size для 32-bit процесса = 4
-            bool is64BitProcess = IntPtr.Size == 8; // false для 32-bit VS
+            // КРИТИЧНО: ТОЛЬКО IntPtr.Size!
+            bool is64BitProcess = IntPtr.Size == 8;
             string targetDllName = is64BitProcess ? "libcurl-x64.dll" : "libcurl-x86.dll";
-
+            if ((!is64BitProcess) && (targetDllName == "libcurl-x64.dll") || (targetDllName == null))
+            {
+                // ВЫБРАСЫВАЕМ ИСКЛЮЧЕНИЕ для отладки
+                throw new Exception(
+                    $"=== DEBUG ARCHITECTURE ===\n" +
+                    $"IntPtr.Size: {IntPtr.Size} (4=32-bit, 8=64-bit)\n" +
+                    $"Environment.Is64BitProcess: {Environment.Is64BitProcess}\n" +
+                    $"Environment.Is64BitOperatingSystem: {Environment.Is64BitOperatingSystem}\n" +
+                    $"Target DLL: {targetDllName}\n" +
+                    $"Assembly: {assembly.FullName}\n" +
+                    $"Resources found: {allResources.Length}\n" +
+                    $"Resource list:\n{string.Join("\n", allResources)}");
+            }
             // Логируем для отладки
             string debugInfo = $"Process: {(is64BitProcess ? "x64" : "x86")}, " +
                               $"Looking for: {targetDllName}, " +

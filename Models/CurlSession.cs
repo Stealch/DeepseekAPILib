@@ -55,7 +55,7 @@ namespace DeepseekAPILib.Curl
         }
 
         // ============ SYNCHRONOUS METHODS ============
-
+        #region SYNCHRONOUS METHODS
         public void SetUrl(string url)
         {
             var result = NativeMethods.curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_URL, url);
@@ -149,7 +149,7 @@ namespace DeepseekAPILib.Curl
                 return UIntPtr.Zero;
             }
         }
-
+        #endregion
         // ============ STREAMING METHODS ============
         #region STREAMING METHODS
 
