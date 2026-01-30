@@ -4,13 +4,10 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Linq;
+using DeepseekAPILib.Utilities;
 
 namespace DeepseekAPILib.Curl
 {
-    /// <summary>
-    /// Загрузчик libcurl из embedded ресурсов
-    /// Использует Assembly Guid для уникальности временной папки
-    /// </summary>
     internal static class LibCurlLoader
     {
         private static bool _isLoaded = false;
@@ -19,7 +16,6 @@ namespace DeepseekAPILib.Curl
         private static string _tempFolderPath;
         private static string _sessionId;
 
-        // Кэшируем Assembly Guid
         private static string _assemblyGuid;
         private static string AssemblyGuid
         {
@@ -36,9 +32,6 @@ namespace DeepseekAPILib.Curl
             }
         }
 
-        /// <summary>
-        /// Гарантирует загрузку libcurl и очистку старых сессий
-        /// </summary>
         public static void EnsureLoaded()
         {
             if (_isLoaded) return;
@@ -49,25 +42,25 @@ namespace DeepseekAPILib.Curl
 
                 try
                 {
-                    // 1. Очищаем старые сессии
-                   // CleanupPreviousSessions();
-
-                    // 2. Создаем новую сессию
+                    Logger.Log("LibCurlLoader.EnsureLoaded started");
+                    
                     CreateSessionFolder();
+                    Logger.Log($"Session folder created: {_tempFolderPath}");
 
-                    // 3. Извлекаем DLL
                     ExtractEmbeddedLibCurl();
+                    Logger.Log($"DLL extracted to: {_tempDllPath}");
 
-                    // 4. Загружаем DLL
                     LoadNativeLibrary();
+                    Logger.Log($"DLL loaded successfully");
 
                     _isLoaded = true;
-
-                    // 5. Регистрируем очистку при выходе
+                    
                    // RegisterCleanupOnExit();
+                   // Logger.Log("Cleanup registered");
                 }
                 catch (Exception ex)
                 {
+                    Logger.LogError(ex, "LibCurlLoader.EnsureLoaded");
                     throw new DllNotFoundException(
                         $"Не удалось загрузить libcurl: {ex.Message}\n" +
                         $"Путь: {_tempDllPath}", ex);
@@ -75,9 +68,6 @@ namespace DeepseekAPILib.Curl
             }
         }
 
-        /// <summary>
-        /// Очищает все предыдущие сессии с таким же Assembly Guid
-        /// </summary>
         private static void CleanupPreviousSessions()
         {
             try
@@ -85,7 +75,6 @@ namespace DeepseekAPILib.Curl
                 var tempRoot = Path.GetTempPath();
                 var searchPattern = $"{AssemblyGuid}_*";
 
-                // Безопасный поиск папок
                 if (!Directory.Exists(tempRoot))
                     return;
 
@@ -95,7 +84,6 @@ namespace DeepseekAPILib.Curl
                 {
                     try
                     {
-                        // Проверяем, что это действительно наша папка
                         if (IsOurSessionFolder(folder))
                         {
                             Directory.Delete(folder, recursive: true);
@@ -103,13 +91,12 @@ namespace DeepseekAPILib.Curl
                     }
                     catch (IOException)
                     {
-                        // Файлы заняты - пропускаем, удалим при следующем запуске
+                        // Файлы заняты - пропускаем
                     }
                     catch (UnauthorizedAccessException)
                     {
                         // Нет прав - пропускаем
                     }
-                    // Игнорируем остальные ошибки
                 }
             }
             catch
@@ -118,30 +105,21 @@ namespace DeepseekAPILib.Curl
             }
         }
 
-        /// <summary>
-        /// Проверяет, что папка соответствует нашему формату
-        /// </summary>
         private static bool IsOurSessionFolder(string folderPath)
         {
             var folderName = Path.GetFileName(folderPath);
             if (string.IsNullOrEmpty(folderName))
                 return false;
 
-            // Формат: {GUID}_{TIMESTAMP}
             var parts = folderName.Split('_');
             if (parts.Length < 2)
                 return false;
 
-            // Проверяем GUID часть
             return parts[0].Equals(AssemblyGuid, StringComparison.OrdinalIgnoreCase);
         }
 
-        /// <summary>
-        /// Создает новую уникальную папку сессии
-        /// </summary>
         private static void CreateSessionFolder()
         {
-            // Формат: {AssemblyGuid}_{Timestamp}
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
             _sessionId = $"{AssemblyGuid}_{timestamp}";
 
@@ -153,89 +131,152 @@ namespace DeepseekAPILib.Curl
         {
             var assembly = Assembly.GetExecutingAssembly();
             var allResources = assembly.GetManifestResourceNames();
+            
+            Logger.Log($"Total resources: {allResources.Length}");
+            foreach (var resource in allResources)
+            {
+                Logger.Log($"  Resource: {resource}");
+            }
 
-            // КРИТИЧНО: ТОЛЬКО IntPtr.Size!
             bool is64BitProcess = IntPtr.Size == 8;
             string targetDllName = is64BitProcess ? "libcurl-x64.dll" : "libcurl-x86.dll";
+            
+            Logger.Log($"Target DLL: {targetDllName}");
+            Logger.Log($"Architecture: IntPtr.Size={IntPtr.Size}, is64BitProcess={is64BitProcess}");
+
             if ((!is64BitProcess) && (targetDllName == "libcurl-x64.dll") || (targetDllName == null))
             {
-                // ВЫБРАСЫВАЕМ ИСКЛЮЧЕНИЕ для отладки
-                throw new Exception(
-                    $"=== DEBUG ARCHITECTURE ===\n" +
-                    $"IntPtr.Size: {IntPtr.Size} (4=32-bit, 8=64-bit)\n" +
-                    $"Environment.Is64BitProcess: {Environment.Is64BitProcess}\n" +
-                    $"Environment.Is64BitOperatingSystem: {Environment.Is64BitOperatingSystem}\n" +
-                    $"Target DLL: {targetDllName}\n" +
-                    $"Assembly: {assembly.FullName}\n" +
-                    $"Resources found: {allResources.Length}\n" +
-                    $"Resource list:\n{string.Join("\n", allResources)}");
+                var errorMsg = $"=== ARCHITECTURE DEBUG ===\n" +
+                              $"IntPtr.Size: {IntPtr.Size}\n" +
+                              $"targetDllName: {targetDllName}\n" +
+                              $"is64BitProcess: {is64BitProcess}";
+                
+                Logger.Log(errorMsg);
+                throw new Exception(errorMsg);
             }
-            // Логируем для отладки
-            string debugInfo = $"Process: {(is64BitProcess ? "x64" : "x86")}, " +
-                              $"Looking for: {targetDllName}, " +
-                              $"Resources: {string.Join(", ", allResources)}";
 
-            // Сохраняем для возможного отображения ошибки
-            string searchInfo = debugInfo;
-
-            // Ищем нужную DLL
             string resourceName = allResources.FirstOrDefault(r =>
                 r.EndsWith("." + targetDllName, StringComparison.OrdinalIgnoreCase));
 
             if (resourceName == null)
             {
-                // Fallback: ищем любой libcurl
+                Logger.Log($"Target DLL '{targetDllName}' not found in resources");
+                
                 resourceName = allResources.FirstOrDefault(r =>
                     r.IndexOf("libcurl", StringComparison.OrdinalIgnoreCase) >= 0);
+                    
+                if (resourceName != null)
+                {
+                    Logger.Log($"Fallback found: {resourceName}");
+                }
             }
 
             if (resourceName == null)
             {
-                throw new DllNotFoundException(
-                    $"libcurl for {(is64BitProcess ? "x64" : "x86")} process not found. " +
-                    searchInfo);
+                var errorMsg = $"libcurl for {(is64BitProcess ? "x64" : "x86")} process not found. " +
+                              $"Resources: {string.Join(", ", allResources)}";
+                Logger.Log(errorMsg);
+                throw new DllNotFoundException(errorMsg);
             }
 
+            Logger.Log($"Using resource: {resourceName}");
+            
             _tempDllPath = Path.Combine(_tempFolderPath, targetDllName);
+            Logger.Log($"Temp DLL path: {_tempDllPath}");
 
             using var resourceStream = assembly.GetManifestResourceStream(resourceName);
             if (resourceStream == null)
+            {
+                Logger.Log($"ERROR: Cannot open resource stream: {resourceName}");
                 throw new FileNotFoundException($"Cannot open: {resourceName}");
+            }
 
             using var fileStream = File.Create(_tempDllPath);
             resourceStream.CopyTo(fileStream);
+            Logger.Log($"DLL written to disk: {new FileInfo(_tempDllPath).Length} bytes");
+
+            try
+            {
+                ExtractResourceIfExists("DeepseekAPILib.curl-ca-bundle.crt", "curl-ca-bundle.crt");
+                Logger.Log("CA bundle extracted");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "ExtractResourceIfExists");
+                throw;
+            }
+        }
+
+        private static void ExtractResourceIfExists(string resourceName, string targetFileName)
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            var allResources = assembly.GetManifestResourceNames();
+            
+            Logger.Log($"Looking for CA bundle: {resourceName}");
+            Logger.Log($"Available resources: {allResources.Length}");
+
+            bool found = false;
+            foreach (var res in allResources)
+            {
+                if (res.Equals(resourceName, StringComparison.Ordinal))
+                {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                var errorMsg = $"Resource '{resourceName}' not found. Available: {string.Join(", ", allResources)}";
+                Logger.Log(errorMsg);
+                throw new Exception(errorMsg);
+            }
+
+            using var resourceStream = assembly.GetManifestResourceStream(resourceName);
+            if (resourceStream == null)
+            {
+                Logger.Log($"ERROR: Cannot open CA bundle stream: {resourceName}");
+                throw new Exception($"Cannot open resource stream for '{resourceName}'");
+            }
+
+            var targetPath = Path.Combine(_tempFolderPath, targetFileName);
+            Logger.Log($"CA bundle target: {targetPath}");
+
+            using var fileStream = File.Create(targetPath);
+            resourceStream.CopyTo(fileStream);
+            
+            Logger.Log($"CA bundle created: {new FileInfo(targetPath).Length} bytes");
         }
 
         private static void LoadNativeLibrary()
         {
             if (!File.Exists(_tempDllPath))
+            {
+                Logger.Log($"ERROR: DLL not found at: {_tempDllPath}");
                 throw new FileNotFoundException($"DLL not found: {_tempDllPath}");
+            }
 
             var handle = LoadLibrary(_tempDllPath);
             if (handle == IntPtr.Zero)
             {
                 var error = Marshal.GetLastWin32Error();
+                Logger.Log($"ERROR: LoadLibrary failed. Code: {error}, Path: {_tempDllPath}");
                 throw new DllNotFoundException(
                     $"Ошибка загрузки libcurl. Код: {error}, Путь: {_tempDllPath}");
             }
+            
+            Logger.Log($"LoadLibrary successful, handle: {handle}");
         }
 
         [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         private static extern IntPtr LoadLibrary(string lpFileName);
 
-        /// <summary>
-        /// Регистрирует очистку при завершении процесса
-        /// </summary>
         private static void RegisterCleanupOnExit()
         {
-            // Очистка при обычном завершении
-            AppDomain.CurrentDomain.DomainUnload += (s, e) => CleanupCurrentSession();
-            AppDomain.CurrentDomain.ProcessExit += (s, e) => CleanupCurrentSession();
+          //  AppDomain.CurrentDomain.DomainUnload += (s, e) => CleanupCurrentSession();
+          //  AppDomain.CurrentDomain.ProcessExit += (s, e) => CleanupCurrentSession();
         }
 
-        /// <summary>
-        /// Получает информацию о текущей сессии (для отладки)
-        /// </summary>
         public static string GetSessionInfo()
         {
             if (!_isLoaded)
@@ -251,9 +292,6 @@ namespace DeepseekAPILib.Curl
                    $"Папка существует: {folderExists}";
         }
 
-        /// <summary>
-        /// Очищает текущую сессию
-        /// </summary>
         public static void CleanupCurrentSession()
         {
             try
@@ -266,7 +304,6 @@ namespace DeepseekAPILib.Curl
                     }
                     catch (IOException)
                     {
-                        // Файлы могут быть заняты - пробуем переименовать и пометить для удаления
                         try
                         {
                             var markedPath = _tempFolderPath + "_DELETE_ME";
@@ -303,13 +340,10 @@ namespace DeepseekAPILib.Curl
                    $"Resources: {string.Join(", ", resources)}";
         }
 
-            /// <summary>
-            /// Явная очистка всех сессий (вызывать при запуске приложения)
-            /// </summary>
-            public static void CleanupAllSessions()
+       /* public static void CleanupAllSessions()
         {
             CleanupCurrentSession();
             CleanupPreviousSessions();
-        }
+        }*/
     }
 }

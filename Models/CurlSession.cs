@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DeepseekAPILib.Utilities;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -37,21 +38,64 @@ namespace DeepseekAPILib.Curl
         // Событие для streaming данных
         public event EventHandler<string> OnStreamDataReceived;
 
+        // СТАТИЧЕСКИЙ КОНСТРУКТОР - гарантируем загрузку NativeMethods
+        static CurlSession()
+        {
+            try
+            {
+                Logger.Log("=== CurlSession static constructor START ===");
+
+                // Вместо обращения к CURLE_OK, просто вызываем статический конструктор
+                // NativeMethods через создание временного экземпляра или вызов метода
+                // Самый простой способ: обращаемся к любому публичному методу/свойству
+
+                // Вариант 1: Используем System.Runtime.CompilerServices.RuntimeHelpers
+                // Вариант 2: Просто пишем лог - статический конструктор NativeMethods 
+                //           все равно вызовется при первом обращении к любому методу
+
+                Logger.Log("NativeMethods will be initialized on first use");
+                Logger.Log("=== CurlSession static constructor SUCCESS ===");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "CurlSession static constructor");
+                throw;
+            }
+        }
+
         public CurlSession()
         {
-            _curlHandle = NativeMethods.curl_easy_init();
-            if (_curlHandle == IntPtr.Zero)
-                throw new InvalidOperationException("Failed to initialize curl");
+            try
+            {
+                Logger.Log("=== CurlSession constructor START ===");
 
-            _responseBuilder = new StringBuilder();
-            _writeCallback = WriteCallback;
-            _callbackHandle = GCHandle.Alloc(_writeCallback);
+                // Здесь произойдет инициализация NativeMethods при первом вызове
+                _curlHandle = NativeMethods.curl_easy_init();
+                Logger.Log($"curl_easy_init returned: {_curlHandle}");
 
-            // Инициализация для streaming
-            _streamingQueue = new BlockingCollection<string>(1000); // Buffer 1000 сообщений
-            _streamingCts = new CancellationTokenSource();
-            _streamingWriteCallback = StreamingWriteCallback;
-            _streamingCallbackHandle = GCHandle.Alloc(_streamingWriteCallback);
+                if (_curlHandle == IntPtr.Zero)
+                {
+                    Logger.Log("ERROR: curl_easy_init returned zero");
+                    throw new InvalidOperationException("Failed to initialize curl");
+                }
+
+                _responseBuilder = new StringBuilder();
+                _writeCallback = WriteCallback;
+                _callbackHandle = GCHandle.Alloc(_writeCallback);
+
+                // Инициализация для streaming
+                _streamingQueue = new BlockingCollection<string>(1000);
+                _streamingCts = new CancellationTokenSource();
+                _streamingWriteCallback = StreamingWriteCallback;
+                _streamingCallbackHandle = GCHandle.Alloc(_streamingWriteCallback);
+
+                Logger.Log("=== CurlSession constructor SUCCESS ===");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "CurlSession constructor");
+                throw;
+            }
         }
 
         // ============ SYNCHRONOUS METHODS ============
@@ -95,8 +139,29 @@ namespace DeepseekAPILib.Curl
 
         public void SetCaBundle(string caBundlePath)
         {
-            var result = NativeMethods.curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_CAINFO, caBundlePath);
-            CheckResult(result, "SetCaBundle");
+            try
+            {
+                Logger.Log($"CurlSession.SetCaBundle called with: {caBundlePath}");
+
+                if (!File.Exists(caBundlePath))
+                {
+                    Logger.Log($"ERROR: CA bundle file not found: {caBundlePath}");
+                    throw new FileNotFoundException($"CA bundle not found: {caBundlePath}");
+                }
+
+                var fileInfo = new FileInfo(caBundlePath);
+                Logger.Log($"CA bundle file size: {fileInfo.Length} bytes");
+
+                var result = NativeMethods.curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_CAINFO, caBundlePath);
+                CheckResult(result, "SetCaBundle");
+
+                Logger.Log($"CA bundle set successfully: {caBundlePath}");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "SetCaBundle");
+                throw;
+            }
         }
 
         public void SetTimeouts(int connectTimeoutSec = 10, int timeoutSec = 30)
@@ -127,9 +192,11 @@ namespace DeepseekAPILib.Curl
                 CheckResult(result, "SetHeaders");
             }
 
+            Logger.Log("Calling curl_easy_perform...");
             result = NativeMethods.curl_easy_perform(_curlHandle);
             handle.Free();
             CheckResult(result, "Perform");
+            Logger.Log("curl_easy_perform completed successfully");
         }
 
         private UIntPtr WriteCallback(IntPtr buffer, UIntPtr size, UIntPtr nitems, IntPtr userdata)
