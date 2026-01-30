@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-
+using System.Runtime.CompilerServices;
 
 // Models\CurlSession.cs
 
@@ -70,7 +70,7 @@ namespace DeepseekAPILib.Curl
                 Logger.Log("=== CurlSession constructor START ===");
 
                 // Здесь произойдет инициализация NativeMethods при первом вызове
-                _curlHandle = NativeMethods.curl_easy_init();
+                _curlHandle = NativeMethods.Curl_easy_init();
                 Logger.Log($"curl_easy_init returned: {_curlHandle}");
 
                 if (_curlHandle == IntPtr.Zero)
@@ -102,38 +102,38 @@ namespace DeepseekAPILib.Curl
         #region SYNCHRONOUS METHODS
         public void SetUrl(string url)
         {
-            var result = NativeMethods.curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_URL, url);
+            var result = NativeMethods.Curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_URL, url);
             CheckResult(result, "SetUrl");
         }
 
         public void SetPostData(string jsonData)
         {
-            var result = NativeMethods.curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_POST, 1L);
+            var result = NativeMethods.Curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_POST, 1L);
             CheckResult(result, "SetPostMethod");
 
-            result = NativeMethods.curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_POSTFIELDS, jsonData);
+            result = NativeMethods.Curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_POSTFIELDS, jsonData);
             CheckResult(result, "SetPostData");
         }
 
         public void AddHeader(string header)
         {
-            _headersList = NativeMethods.curl_slist_append(_headersList, header);
+            _headersList = NativeMethods.Curl_slist_append(_headersList, header);
         }
 
         public void SetTls12WithHttp2()
         {
-            var result = NativeMethods.curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_SSLVERSION,
+            var result = NativeMethods.Curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_SSLVERSION,
                 CurlConstants.CURL_SSLVERSION_TLSv1_2);
             CheckResult(result, "SetTls12");
 
-            result = NativeMethods.curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_HTTP_VERSION,
+            result = NativeMethods.Curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_HTTP_VERSION,
                 CurlConstants.CURL_HTTP_VERSION_2TLS);
             CheckResult(result, "SetHttp2");
         }
 
         public void SetUserAgent(string userAgent)
         {
-            var result = NativeMethods.curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_USERAGENT, userAgent);
+            var result = NativeMethods.Curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_USERAGENT, userAgent);
             CheckResult(result, "SetUserAgent");
         }
 
@@ -152,7 +152,7 @@ namespace DeepseekAPILib.Curl
                 var fileInfo = new FileInfo(caBundlePath);
                 Logger.Log($"CA bundle file size: {fileInfo.Length} bytes");
 
-                var result = NativeMethods.curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_CAINFO, caBundlePath);
+                var result = NativeMethods.Curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_CAINFO, caBundlePath);
                 CheckResult(result, "SetCaBundle");
 
                 Logger.Log($"CA bundle set successfully: {caBundlePath}");
@@ -166,34 +166,34 @@ namespace DeepseekAPILib.Curl
 
         public void SetTimeouts(int connectTimeoutSec = 10, int timeoutSec = 30)
         {
-            var result = NativeMethods.curl_easy_setopt(_curlHandle,
+            var result = NativeMethods.Curl_easy_setopt(_curlHandle,
                 CURLoption.CURLOPT_CONNECTTIMEOUT, connectTimeoutSec);
             CheckResult(result, "SetConnectTimeout");
 
-            result = NativeMethods.curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_TIMEOUT, timeoutSec);
+            result = NativeMethods.Curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_TIMEOUT, timeoutSec);
             CheckResult(result, "SetTimeout");
         }
 
         public void Perform()
         {
-            var result = NativeMethods.curl_easy_setopt(_curlHandle,
+            var result = NativeMethods.Curl_easy_setopt(_curlHandle,
                 CURLoption.CURLOPT_WRITEFUNCTION, _writeCallback);
             CheckResult(result, "SetWriteCallback");
 
             var handle = GCHandle.Alloc(_responseBuilder);
-            result = NativeMethods.curl_easy_setopt(_curlHandle,
+            result = NativeMethods.Curl_easy_setopt(_curlHandle,
                 CURLoption.CURLOPT_WRITEDATA, GCHandle.ToIntPtr(handle));
             CheckResult(result, "SetWriteData");
 
             if (_headersList != IntPtr.Zero)
             {
-                result = NativeMethods.curl_easy_setopt(_curlHandle,
+                result = NativeMethods.Curl_easy_setopt(_curlHandle,
                     CURLoption.CURLOPT_HTTPHEADER, _headersList);
                 CheckResult(result, "SetHeaders");
             }
 
             Logger.Log("Calling curl_easy_perform...");
-            result = NativeMethods.curl_easy_perform(_curlHandle);
+            result = NativeMethods.Curl_easy_perform(_curlHandle);
             handle.Free();
             CheckResult(result, "Perform");
             Logger.Log("curl_easy_perform completed successfully");
@@ -231,19 +231,19 @@ namespace DeepseekAPILib.Curl
             _isStreamingMode = true;
 
             // Настраиваем callback для streaming
-            var result = NativeMethods.curl_easy_setopt(_curlHandle,
+            var result = NativeMethods.Curl_easy_setopt(_curlHandle,
                 CURLoption.CURLOPT_WRITEFUNCTION, _streamingWriteCallback);
             CheckResult(result, "SetStreamingCallback");
 
             // Передаем указатель на текущий экземпляр
             var handle = GCHandle.Alloc(this);
-            result = NativeMethods.curl_easy_setopt(_curlHandle,
+            result = NativeMethods.Curl_easy_setopt(_curlHandle,
                 CURLoption.CURLOPT_WRITEDATA, GCHandle.ToIntPtr(handle));
             CheckResult(result, "SetStreamingData");
 
             if (_headersList != IntPtr.Zero)
             {
-                result = NativeMethods.curl_easy_setopt(_curlHandle,
+                result = NativeMethods.Curl_easy_setopt(_curlHandle,
                     CURLoption.CURLOPT_HTTPHEADER, _headersList);
                 CheckResult(result, "SetHeaders");
             }
@@ -253,10 +253,10 @@ namespace DeepseekAPILib.Curl
             {
                 try
                 {
-                    var performResult = NativeMethods.curl_easy_perform(_curlHandle);
+                    var performResult = NativeMethods.Curl_easy_perform(_curlHandle);
                     if (performResult != CURLcode.CURLE_OK)
                     {
-                        var errorPtr = NativeMethods.curl_easy_strerror(performResult);
+                        var errorPtr = NativeMethods.Curl_easy_strerror(performResult);
                         LastError = $"Streaming failed: {Marshal.PtrToStringAnsi(errorPtr)}";
                         _streamingQueue.CompleteAdding();
                     }
@@ -310,7 +310,7 @@ namespace DeepseekAPILib.Curl
         /// Читает все chunks данных (асинхронно)
         /// </summary>
         public async IAsyncEnumerable<string> ReadAllChunksAsync(
-    [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    [   EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             if (!_isStreamingMode)
                 throw new InvalidOperationException("Not in streaming mode");
@@ -382,7 +382,7 @@ namespace DeepseekAPILib.Curl
         {
             if (result != CURLcode.CURLE_OK)
             {
-                var errorPtr = NativeMethods.curl_easy_strerror(result);
+                var errorPtr = NativeMethods.Curl_easy_strerror(result);
                 LastError = $"{operation} failed: {Marshal.PtrToStringAnsi(errorPtr)}";
                 throw new InvalidOperationException(LastError);
             }
@@ -396,13 +396,13 @@ namespace DeepseekAPILib.Curl
 
             if (_headersList != IntPtr.Zero)
             {
-                NativeMethods.curl_slist_free_all(_headersList);
+                NativeMethods.Curl_slist_free_all(_headersList);
                 _headersList = IntPtr.Zero;
             }
 
             if (_curlHandle != IntPtr.Zero)
             {
-                NativeMethods.curl_easy_cleanup(_curlHandle);
+                NativeMethods.Curl_easy_cleanup(_curlHandle);
                 _curlHandle = IntPtr.Zero;
             }
 
@@ -432,13 +432,13 @@ namespace DeepseekAPILib.Curl
             // Только освобождение нативных ресурсов
             if (_curlHandle != IntPtr.Zero)
             {
-                NativeMethods.curl_easy_cleanup(_curlHandle);
+                NativeMethods.Curl_easy_cleanup(_curlHandle);
                 _curlHandle = IntPtr.Zero;
             }
 
             if (_headersList != IntPtr.Zero)
             {
-                NativeMethods.curl_slist_free_all(_headersList);
+                NativeMethods.Curl_slist_free_all(_headersList);
                 _headersList = IntPtr.Zero;
             }
 

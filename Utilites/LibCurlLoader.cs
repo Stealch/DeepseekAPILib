@@ -43,7 +43,7 @@ namespace DeepseekAPILib.Curl
                 try
                 {
                     Logger.Log("LibCurlLoader.EnsureLoaded started");
-                    
+
                     CreateSessionFolder();
                     Logger.Log($"Session folder created: {_tempFolderPath}");
 
@@ -54,7 +54,7 @@ namespace DeepseekAPILib.Curl
                     Logger.Log($"DLL loaded successfully");
 
                     _isLoaded = true;
-                    
+
                    // RegisterCleanupOnExit();
                    // Logger.Log("Cleanup registered");
                 }
@@ -131,7 +131,7 @@ namespace DeepseekAPILib.Curl
         {
             var assembly = Assembly.GetExecutingAssembly();
             var allResources = assembly.GetManifestResourceNames();
-            
+
             Logger.Log($"Total resources: {allResources.Length}");
             foreach (var resource in allResources)
             {
@@ -140,7 +140,7 @@ namespace DeepseekAPILib.Curl
 
             bool is64BitProcess = IntPtr.Size == 8;
             string targetDllName = is64BitProcess ? "libcurl-x64.dll" : "libcurl-x86.dll";
-            
+
             Logger.Log($"Target DLL: {targetDllName}");
             Logger.Log($"Architecture: IntPtr.Size={IntPtr.Size}, is64BitProcess={is64BitProcess}");
 
@@ -150,7 +150,7 @@ namespace DeepseekAPILib.Curl
                               $"IntPtr.Size: {IntPtr.Size}\n" +
                               $"targetDllName: {targetDllName}\n" +
                               $"is64BitProcess: {is64BitProcess}";
-                
+
                 Logger.Log(errorMsg);
                 throw new Exception(errorMsg);
             }
@@ -161,10 +161,10 @@ namespace DeepseekAPILib.Curl
             if (resourceName == null)
             {
                 Logger.Log($"Target DLL '{targetDllName}' not found in resources");
-                
+
                 resourceName = allResources.FirstOrDefault(r =>
                     r.IndexOf("libcurl", StringComparison.OrdinalIgnoreCase) >= 0);
-                    
+
                 if (resourceName != null)
                 {
                     Logger.Log($"Fallback found: {resourceName}");
@@ -180,7 +180,7 @@ namespace DeepseekAPILib.Curl
             }
 
             Logger.Log($"Using resource: {resourceName}");
-            
+
             _tempDllPath = Path.Combine(_tempFolderPath, targetDllName);
             Logger.Log($"Temp DLL path: {_tempDllPath}");
 
@@ -211,7 +211,7 @@ namespace DeepseekAPILib.Curl
         {
             var assembly = Assembly.GetExecutingAssembly();
             var allResources = assembly.GetManifestResourceNames();
-            
+
             Logger.Log($"Looking for CA bundle: {resourceName}");
             Logger.Log($"Available resources: {allResources.Length}");
 
@@ -244,7 +244,7 @@ namespace DeepseekAPILib.Curl
 
             using var fileStream = File.Create(targetPath);
             resourceStream.CopyTo(fileStream);
-            
+
             Logger.Log($"CA bundle created: {new FileInfo(targetPath).Length} bytes");
         }
 
@@ -264,7 +264,7 @@ namespace DeepseekAPILib.Curl
                 throw new DllNotFoundException(
                     $"Ошибка загрузки libcurl. Код: {error}, Путь: {_tempDllPath}");
             }
-            
+
             Logger.Log($"LoadLibrary successful, handle: {handle}");
         }
 

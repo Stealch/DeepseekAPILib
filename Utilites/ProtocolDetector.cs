@@ -82,7 +82,7 @@ namespace DeepseekAPILib
                 var enabled = clientKey.GetValue("Enabled") as int?;
                 var disabledByDefault = clientKey.GetValue("DisabledByDefault") as int?;
 
-                bool clientEnabled = (enabled.HasValue && enabled.Value == 1) ||
+                bool clientEnabled = (enabled == 1) ||
                                      (!disabledByDefault.HasValue || disabledByDefault.Value == 0);
 
                 if (!clientEnabled)
@@ -97,7 +97,7 @@ namespace DeepseekAPILib
                     var serverEnabledValue = serverKey.GetValue("Enabled") as int?;
                     var serverDisabledByDefault = serverKey.GetValue("DisabledByDefault") as int?;
 
-                    bool serverEnabled = (serverEnabledValue.HasValue && serverEnabledValue.Value == 1) ||
+                    bool serverEnabled = (serverEnabledValue == 1) ||
                                          (!serverDisabledByDefault.HasValue || serverDisabledByDefault.Value == 0);
 
                     if (!serverEnabled)
@@ -117,26 +117,26 @@ namespace DeepseekAPILib
         /// </summary>
         public static bool CanUseHttpClient()
         {
-            var version = GetWindowsVersion();
+            var (Major, Minor, Build, IsServer) = GetWindowsVersion();
 
             // Не Windows или ошибка определения
-            if (version.Major == 0)
+            if (Major == 0)
                 return false;
 
             // Windows 10+ (10.0) - всегда можно, GCM включен по умолчанию
-            if (version.Major >= 10)
+            if (Major >= 10)
                 return true;
 
             // Windows 7/Server 2008 R2 (6.1) - нельзя, нет GCM шифра
-            if (version.Major == 6 && version.Minor == 1)
+            if (Major == 6 && Minor == 1)
                 return false;
 
             // Windows 8/Server 2012 (6.2) - нельзя, нет GCM шифра
-            if (version.Major == 6 && version.Minor == 2)
+            if (Major == 6 && Minor == 2)
                 return false;
 
             // Windows 8.1/Server 2012 R2 (6.3) - проверяем включен ли TLS 1.2
-            if (version.Major == 6 && version.Minor == 3)
+            if (Major == 6 && Minor == 3)
                 return IsTls12EnabledInRegistry();
 
             // Неизвестная/экзотическая версия - предполагаем нельзя
@@ -174,15 +174,15 @@ namespace DeepseekAPILib
 
         public static string TestProtocolDetector()
         {
-            var version = GetWindowsVersion();
+            var (Major, Minor, Build, IsServer) = GetWindowsVersion();
             bool tlsEnabled = IsTls12EnabledInRegistry();
 
             var sb = new StringBuilder();
-            sb.AppendLine($"Detected OS: {version.Major}.{version.Minor}.{version.Build}");
-            sb.AppendLine($"IsWindows7: {version.Major == 6 && version.Minor == 1}");
-            sb.AppendLine($"IsWindows8: {version.Major == 6 && version.Minor == 2}");
-            sb.AppendLine($"IsWindows8.1: {version.Major == 6 && version.Minor == 3}");
-            sb.AppendLine($"IsWindows10+: {version.Major >= 10}");
+            sb.AppendLine($"Detected OS: {Major}.{Minor}.{Build}");
+            sb.AppendLine($"IsWindows7: {Major == 6 && Minor == 1}");
+            sb.AppendLine($"IsWindows8: {Major == 6 && Minor == 2}");
+            sb.AppendLine($"IsWindows8.1: {Major == 6 && Minor == 3}");
+            sb.AppendLine($"IsWindows10+: {Major >= 10}");
             sb.AppendLine($"TLS 1.2 in registry: {tlsEnabled}");
             sb.AppendLine($"CanUseHttpClient: {CanUseHttpClient()}");
 
@@ -192,9 +192,9 @@ namespace DeepseekAPILib
         // Обратная совместимость (если где-то используется)
         public static bool IsWindows8_1OrNewer()
         {
-            var version = GetWindowsVersion();
-            return (version.Major == 6 && version.Minor == 3 && version.Build >= 9600) ||
-                   version.Major >= 10;
+            var (Major, Minor, Build, IsServer) = GetWindowsVersion();
+            return (Major == 6 && Minor == 3 && Build >= 9600) ||
+                   Major >= 10;
         }
     }
 

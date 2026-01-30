@@ -285,65 +285,65 @@ namespace DeepseekAPILib.Curl
         private delegate void curl_slist_free_all_delegate(IntPtr list);
 
         // Публичные методы-обертки
-        public static IntPtr curl_easy_init()
+        public static IntPtr Curl_easy_init()
         {
             Logger.Log("NativeMethods.curl_easy_init() called");
             return _curlEasyInit.Value();
         }
 
-        public static void curl_easy_cleanup(IntPtr handle)
+        public static void Curl_easy_cleanup(IntPtr handle)
         {
             Logger.Log($"NativeMethods.curl_easy_cleanup({handle}) called");
             _curlEasyCleanup.Value(handle);
         }
 
-        public static CURLcode curl_easy_perform(IntPtr handle)
+        public static CURLcode Curl_easy_perform(IntPtr handle)
         {
             Logger.Log($"NativeMethods.curl_easy_perform({handle}) called");
             return _curlEasyPerform.Value(handle);
         }
 
-        public static IntPtr curl_easy_strerror(CURLcode code)
+        public static IntPtr Curl_easy_strerror(CURLcode code)
         {
             return _curlEasyStrerror.Value(code);
         }
 
-        public static CURLcode curl_easy_setopt(IntPtr handle, CURLoption option, string value)
+        public static CURLcode Curl_easy_setopt(IntPtr handle, CURLoption option, string value)
         {
             return _curlEasySetoptString.Value(handle, option, value);
         }
 
-        public static CURLcode curl_easy_setopt(IntPtr handle, CURLoption option, long value)
+        public static CURLcode Curl_easy_setopt(IntPtr handle, CURLoption option, long value)
         {
             return _curlEasySetoptLong.Value(handle, option, value);
         }
 
-        public static CURLcode curl_easy_setopt(IntPtr handle, CURLoption option, int value)
+        public static CURLcode Curl_easy_setopt(IntPtr handle, CURLoption option, int value)
         {
             return _curlEasySetoptInt.Value(handle, option, value);
         }
 
-        public static CURLcode curl_easy_setopt(IntPtr handle, CURLoption option, bool value)
+        public static CURLcode Curl_easy_setopt(IntPtr handle, CURLoption option, bool value)
         {
             return _curlEasySetoptBool.Value(handle, option, value);
         }
 
-        public static CURLcode curl_easy_setopt(IntPtr handle, CURLoption option, curl_write_callback callback)
+        public static CURLcode Curl_easy_setopt(IntPtr handle, CURLoption option, curl_write_callback callback)
         {
             return _curlEasySetoptCallback.Value(handle, option, callback);
         }
 
-        public static CURLcode curl_easy_setopt(IntPtr handle, CURLoption option, IntPtr value)
+        public static CURLcode Curl_easy_setopt(IntPtr handle, CURLoption option, IntPtr value)
         {
             return _curlEasySetoptPtr.Value(handle, option, value);
         }
 
-        public static IntPtr curl_slist_append(IntPtr list, string header)
+        public static IntPtr Curl_slist_append(IntPtr list, string header)
         {
             return _curlSlistAppend.Value(list, header);
         }
 
-        public static void curl_slist_free_all(IntPtr list)
+        public static void Curl_slist_free_all(IntPtr list)
         {
             _curlSlistFreeAll.Value(list);
         }
