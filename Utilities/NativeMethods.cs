@@ -1,4 +1,4 @@
-﻿// Utilites\NativeMethods.cs
+﻿// Utilities\NativeMethods.cs
 using System;
 using System.IO;
 using System.Runtime.InteropServices;

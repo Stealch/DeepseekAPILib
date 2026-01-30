@@ -1,4 +1,4 @@
-﻿// Utilites\LibCurlLoader.cs
+﻿// Utilities\LibCurlLoader.cs
 using System;
 using System.IO;
 using System.Reflection;

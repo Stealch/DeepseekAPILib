@@ -1,4 +1,4 @@
-﻿// Utilites\ProtocolDetector.cs
+﻿// Utilities\ProtocolDetector.cs
 using Microsoft.Win32;
 using System;
 using System.Text;

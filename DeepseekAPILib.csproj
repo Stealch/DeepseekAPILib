@@ -112,11 +112,11 @@
     <Compile Include="Services\BaseDeepSeekClient.cs" />
     <Compile Include="Services\DeepSeekCurlClient.cs" />
     <Compile Include="Services\DeepseekAuthService.cs" />
-    <Compile Include="Utilites\Logger.cs" />
-    <Compile Include="Utilites\ProtocolDetector.cs" />
-    <Compile Include="Utilites\LibCurlLoader.cs" />
-    <Compile Include="Utilites\NativeMethods.cs" />
-    <Compile Include="Utilites\SseParser.cs" />
+    <Compile Include="Utilities\Logger.cs" />
+    <Compile Include="Utilities\ProtocolDetector.cs" />
+    <Compile Include="Utilities\LibCurlLoader.cs" />
+    <Compile Include="Utilities\NativeMethods.cs" />
+    <Compile Include="Utilities\SseParser.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="curl-ca-bundle.crt" />
