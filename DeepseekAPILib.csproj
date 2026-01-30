@@ -112,6 +112,7 @@
     <Compile Include="Services\BaseDeepSeekClient.cs" />
     <Compile Include="Services\DeepSeekCurlClient.cs" />
     <Compile Include="Services\DeepseekAuthService.cs" />
+    <Compile Include="Utilities\ErrorCodes.cs" />
     <Compile Include="Utilities\Logger.cs" />
     <Compile Include="Utilities\ProtocolDetector.cs" />
     <Compile Include="Utilities\LibCurlLoader.cs" />

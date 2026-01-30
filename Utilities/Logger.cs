@@ -1,4 +1,4 @@
-﻿// Utilities\Logger.cs
+﻿// DeepseekAPILib\Utilities\Logger.cs
 using System;
 using System.IO;
 using System.Text;
@@ -11,6 +11,7 @@ namespace DeepseekAPILib.Utilities
         private static readonly object _lock = new object();
         private static string _logFilePath;
         private static bool _initialized = false;
+        private static bool _enabled = true; // По умолчанию включен
 
         static Logger()
         {
@@ -50,8 +51,27 @@ namespace DeepseekAPILib.Utilities
             }
         }
 
+        /// <summary>
+        /// Включить/выключить логирование
+        /// </summary>
+        public static void SetEnabled(bool enabled)
+        {
+            _enabled = enabled;
+            if (enabled && !_initialized)
+            {
+                Initialize();
+            }
+        }
+
+        /// <summary>
+        /// Получить текущий статус логирования
+        /// </summary>
+        public static bool IsEnabled => _enabled;
+
         public static void Log(string message, string context = null)
         {
+            if (!_enabled) return;
+
             try
             {
                 if (!_initialized)
@@ -81,6 +101,8 @@ namespace DeepseekAPILib.Utilities
 
         public static void LogError(Exception ex, string context = null)
         {
+            if (!_enabled) return;
+
             try
             {
                 if (!_initialized)
@@ -100,6 +122,35 @@ namespace DeepseekAPILib.Utilities
 
                     logEntry += $" {ex.GetType().Name}: {ex.Message}\n";
                     File.AppendAllText(_logFilePath, logEntry);
+                }
+            }
+            catch
+            {
+                // Игнорируем
+            }
+        }
+
+        /// <summary>
+        /// Получить путь к файлу лога
+        /// </summary>
+        public static string GetLogFilePath()
+        {
+            return _logFilePath;
+        }
+
+        /// <summary>
+        /// Очистить лог файл
+        /// </summary>
+        public static void ClearLog()
+        {
+            try
+            {
+                lock (_lock)
+                {
+                    if (File.Exists(_logFilePath))
+                    {
+                        File.WriteAllText(_logFilePath, string.Empty);
+                    }
                 }
             }
             catch
