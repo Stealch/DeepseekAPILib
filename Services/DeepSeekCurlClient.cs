@@ -180,7 +180,7 @@ namespace DeepseekAPILib
                             Logger.Log($"CA bundle file size: {fileInfo.Length} bytes, exists: {fileInfo.Exists}");
 
                             _session.SetCaBundle(_tempCaBundlePath);
-                            Logger.Log($"CA bundle set successfully: {_tempCaBundlePath}");
+                            Logger.Log($"Client: CA bundle set successfully: {_tempCaBundlePath}");
                         }
                         catch (Exception caEx)
                         {
@@ -208,14 +208,18 @@ namespace DeepseekAPILib
             }
         }
 
-        public override async Task<Models.ChatResponse> SendChatAsync(Models.ChatRequest request)
+        public override async Task<ChatResponse> SendChatAsync(ChatRequest request)
         {
             await Task.CompletedTask;
 
             Logger.Log($"SendChatAsync called with {request.Messages?.Count ?? 0} messages");
 
+            // ДИАГНОСТИКА: логируем структуру запроса
+            Logger.Log($"Request structure: Model={request.Model}, MaxTokens={request.MaxTokens}, Temperature={request.Temperature}");
+
             var jsonData = JsonConvert.SerializeObject(request, _jsonSettings);
             Logger.Log($"Request JSON prepared, length: {jsonData.Length}");
+            Logger.Log($"Full JSON request: {jsonData}"); // ← ДОБАВЛЕНО
 
             try
             {
@@ -232,6 +236,7 @@ namespace DeepseekAPILib
 
                 var response = _session.Response;
                 Logger.Log($"Response received, length: {response?.Length ?? 0}");
+                Logger.Log($"Full response: {response}"); // ← ДОБАВЛЕНО (полный ответ)
 
                 if (string.IsNullOrEmpty(response))
                 {
@@ -240,11 +245,35 @@ namespace DeepseekAPILib
                 }
 
                 Logger.Log($"Response starts with: {response.Substring(0, Math.Min(100, response.Length))}...");
+
+                // Пробуем распарсить как API error сначала
+                try
+                {
+                    var apiError = JsonConvert.DeserializeObject<Models.ApiError>(response);
+                    if (apiError?.Error != null)
+                    {
+                        Logger.Log($"API Error detected: {apiError.Error.Message}");
+                        throw new Models.DeepseekApiException(
+                            apiError.Error.Message,
+                            400, // предполагаем 400 для parse error
+                            apiError.Error.Type,
+                            apiError.Error.Code);
+                    }
+                }
+                catch (JsonException)
+                {
+                    // Не является ApiError - продолжаем
+                }
+
                 return JsonConvert.DeserializeObject<Models.ChatResponse>(response);
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "SendChatAsync failed");
+
+                if (ex is Models.DeepseekApiException)
+                    throw;
+
                 throw new Models.DeepseekApiException(
                     $"CURL request failed: {ex.Message}",
                     ex,
@@ -252,7 +281,7 @@ namespace DeepseekAPILib
             }
         }
 
-        public override async Task<Models.CompletionResponse> SendCompletionAsync(
+        public override async Task<CompletionResponse> SendCompletionAsync(
             Models.CompletionRequest request)
         {
             await Task.CompletedTask;
@@ -273,7 +302,7 @@ namespace DeepseekAPILib
                 if (string.IsNullOrEmpty(response))
                     throw new Models.DeepseekApiException("Empty response from server", 0);
 
-                return JsonConvert.DeserializeObject<Models.CompletionResponse>(response);
+                return JsonConvert.DeserializeObject<CompletionResponse>(response);
             }
             catch (Exception ex)
             {

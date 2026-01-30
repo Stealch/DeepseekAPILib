@@ -19,6 +19,7 @@ namespace DeepseekAPILib.Curl
         private IntPtr _headersList;
         private bool _disposed;
         private readonly StringBuilder _responseBuilder;
+        private GCHandle _pinnedPostData;
 
         // Streaming support
         private readonly BlockingCollection<string> _streamingQueue;
@@ -111,8 +112,27 @@ namespace DeepseekAPILib.Curl
             var result = NativeMethods.Curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_POST, 1L);
             CheckResult(result, "SetPostMethod");
 
-            result = NativeMethods.Curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_POSTFIELDS, jsonData);
-            CheckResult(result, "SetPostData");
+            Logger.Log($"POST data length: {jsonData?.Length ?? 0}");
+            Logger.Log($"POST data preview: {jsonData?.Substring(0, Math.Min(100, jsonData?.Length ?? 0))}...");
+
+            // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: используем байтовый массив
+            // 1. Конвертируем строку в UTF-8 байты
+            byte[] jsonBytes = System.Text.Encoding.UTF8.GetBytes(jsonData);
+
+            // 2. Фиксируем массив в памяти (чтобы GC не перемещал)
+            _pinnedPostData = GCHandle.Alloc(jsonBytes, GCHandleType.Pinned);
+
+            // 3. Устанавливаем указатель на зафиксированные данные
+            result = NativeMethods.Curl_easy_setopt(_curlHandle,
+                CURLoption.CURLOPT_POSTFIELDS, _pinnedPostData.AddrOfPinnedObject());
+            CheckResult(result, "SetPostDataPointer");
+
+            // 4. Устанавливаем размер данных
+            result = NativeMethods.Curl_easy_setopt(_curlHandle,
+                CURLoption.CURLOPT_POSTFIELDSIZE, jsonBytes.Length);
+            CheckResult(result, "SetPostDataSize");
+
+            Logger.Log($"POST data set: {jsonBytes.Length} bytes, pinned at {_pinnedPostData.AddrOfPinnedObject()}");
         }
 
         public void AddHeader(string header)
@@ -155,7 +175,7 @@ namespace DeepseekAPILib.Curl
                 var result = NativeMethods.Curl_easy_setopt(_curlHandle, CURLoption.CURLOPT_CAINFO, caBundlePath);
                 CheckResult(result, "SetCaBundle");
 
-                Logger.Log($"CA bundle set successfully: {caBundlePath}");
+                Logger.Log($"Session: CA bundle set successfully: {caBundlePath}");
             }
             catch (Exception ex)
             {
@@ -176,6 +196,50 @@ namespace DeepseekAPILib.Curl
 
         public void Perform()
         {
+            // ДИАГНОСТИКА: считаем и логируем заголовки
+            Logger.Log("=== Headers Diagnostics ===");
+
+            if (_headersList != IntPtr.Zero)
+            {
+                Logger.Log("Headers list is not null");
+
+                // Пытаемся прочитать заголовки из curl_slist
+                try
+                {
+                    var current = _headersList;
+                    int count = 0;
+
+                    while (current != IntPtr.Zero)
+                    {
+                        // Структура curl_slist: 
+                        //   char *data (указатель на строку)
+                        //   struct curl_slist *next (указатель на следующий элемент)
+
+                        // Читаем указатель на строку (первое поле)
+                        IntPtr dataPtr = Marshal.ReadIntPtr(current);
+                        if (dataPtr != IntPtr.Zero)
+                        {
+                            string header = Marshal.PtrToStringAnsi(dataPtr);
+                            Logger.Log($"  Header [{count}]: {header}");
+                            count++;
+                        }
+
+                        // Читаем указатель на следующий элемент (второе поле)
+                        current = Marshal.ReadIntPtr(current + IntPtr.Size);
+                    }
+
+                    Logger.Log($"Total headers found: {count}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Log($"Error reading headers: {ex.Message}");
+                }
+            }
+            else
+            {
+                Logger.Log("WARNING: Headers list is null!");
+            }
+
             var result = NativeMethods.Curl_easy_setopt(_curlHandle,
                 CURLoption.CURLOPT_WRITEFUNCTION, _writeCallback);
             CheckResult(result, "SetWriteCallback");
@@ -394,6 +458,12 @@ namespace DeepseekAPILib.Curl
 
             StopStreaming();
 
+            // ОСВОБОЖДАЕМ зафиксированные POST данные
+            if (_pinnedPostData.IsAllocated)
+            {
+                _pinnedPostData.Free();
+            }
+
             if (_headersList != IntPtr.Zero)
             {
                 NativeMethods.Curl_slist_free_all(_headersList);
@@ -427,7 +497,11 @@ namespace DeepseekAPILib.Curl
 
         ~CurlSession()
         {
-            // НЕ вызываем Dispose(false) - финализатор должен быть простым
+            // ОСВОБОЖДАЕМ зафиксированные POST данные в финализаторе
+            if (_pinnedPostData.IsAllocated)
+            {
+                _pinnedPostData.Free();
+            }
 
             // Только освобождение нативных ресурсов
             if (_curlHandle != IntPtr.Zero)
