@@ -99,6 +99,49 @@ namespace DeepseekAPILib.Utilities
             }
         }
 
+        public static void OpenLogFile()
+        {
+            try
+            {
+                var path = GetLogFilePath();
+                if (File.Exists(path))
+                {
+                    // Используем ассоциацию файлов по умолчанию
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = path,
+                        UseShellExecute = true // ← КЛЮЧЕВОЕ: используем шелл
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                LogError(ex, "OpenLogFile");
+            }
+        }
+
+        public static void ShowLogFolder()
+        {
+            try
+            {
+                var path = GetLogFilePath() ?? string.Empty;
+                var folder = Path.GetDirectoryName(path);
+
+                if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
+                {
+                    folder = Path.GetDirectoryName(typeof(Logger).Assembly.Location) ??
+                             AppDomain.CurrentDomain.BaseDirectory;
+                }
+
+                // explorer.exe с кавычками для путей с пробелами
+                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{path}\"");
+            }
+            catch (Exception ex)
+            {
+                LogError(ex, "ShowLogFolder");
+            }
+        }
+
         public static void LogError(Exception ex, string context = null)
         {
             if (!_enabled) return;
